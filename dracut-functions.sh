@@ -971,3 +971,19 @@ get_dev_module() {
     fi
     echo "$dev_drivers"
 }
+
+# is_reflink_supported
+# Check whether the use of reflinks (copy-on-write) is supported
+is_reflink_supported() {
+    local fstype
+    fstype=$(find_mp_fstype /boot)
+    case $fstype in
+        xfs|btrfs) ;;
+        *) return 1;;
+    esac
+    # reflinking doesn't work across mount points
+    if ! mountpoint -q /boot && ! mountpoint -q /usr; then
+        return 0
+    fi
+    return 1
+}

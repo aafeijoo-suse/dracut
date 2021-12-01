@@ -1192,7 +1192,7 @@ else
     exit 1
 fi
 
-if [[ $enhanced_cpio == "yes" ]]; then
+if [[ $enhanced_cpio == "yes" ]] && is_reflink_supported; then
     enhanced_cpio="$dracutbasedir/dracut-cpio"
     if [[ -x $enhanced_cpio ]]; then
         # align based on statfs optimal transfer size
