@@ -9,50 +9,8 @@ export KVERSION=${KVERSION-$(uname -r)}
 #DEBUGFAIL="rd.shell"
 #DEBUGOUT="quiet systemd.log_level=debug systemd.log_target=console loglevel=77  rd.info rd.debug"
 DEBUGOUT="loglevel=0 "
-client_run() {
-    local test_name="$1"; shift
-    local client_opts="$*"
-
-    echo "CLIENT TEST START: $test_name"
-
-    dd if=/dev/zero of=$TESTDIR/result bs=1M count=1
-    $testdir/run-qemu \
-	-drive format=raw,index=0,media=disk,file=$TESTDIR/root.btrfs \
-	-drive format=raw,index=1,media=disk,file=$TESTDIR/usr.btrfs \
-	-drive format=raw,index=2,media=disk,file=$TESTDIR/result \
-	-m 512M  -smp 2 -nographic \
-	-net none \
-        -no-reboot \
-	-append "panic=1 root=LABEL=dracut $client_opts rd.retry=3 console=ttyS0,115200n81 selinux=0 $DEBUGOUT rd.shell=0 $DEBUGFAIL" \
-	-initrd $TESTDIR/initramfs.testing
-
-    if (($? != 0)); then
-	echo "CLIENT TEST END: $test_name [FAILED - BAD EXIT]"
-        return 1
-    fi
-
-    if ! grep -F -m 1 -q dracut-root-block-success $TESTDIR/result; then
-	echo "CLIENT TEST END: $test_name [FAILED]"
-        return 1
-    fi
-    echo "CLIENT TEST END: $test_name [OK]"
-
-}
-
-test_run() {
-    client_run "no option specified" || return 1
-    client_run "readonly root" "ro" || return 1
-    client_run "writeable root" "rw" || return 1
-    return 0
-}
 
 test_setup() {
-    rm -f -- $TESTDIR/root.btrfs
-    rm -f -- $TESTDIR/usr.btrfs
-    # Create the blank file to use as a root filesystem
-    dd if=/dev/null of=$TESTDIR/root.btrfs bs=1M seek=320
-    dd if=/dev/null of=$TESTDIR/usr.btrfs bs=1M seek=320
-
     export kernel=$KVERSION
     # Create what will eventually be our root filesystem onto an overlay
     (
@@ -235,28 +193,6 @@ EOF
 	inst_simple ./99-idesymlinks.rules /etc/udev/rules.d/99-idesymlinks.rules
     )
 
-    # create an initramfs that will create the target root filesystem.
-    # We do it this way so that we do not risk trashing the host mdraid
-    # devices, volume groups, encrypted partitions, etc.
-    $basedir/dracut.sh -l -i $TESTDIR/overlay / \
-	-m "dash udev-rules btrfs base rootfs-block fs-lib kernel-modules" \
-	-d "piix ide-gd_mod ata_piix btrfs sd_mod" \
-        --nomdadmconf \
-        --nohardlink \
-        --no-hostonly-cmdline -N \
-	-f $TESTDIR/initramfs.makeroot $KVERSION || return 1
-
-    # Invoke KVM and/or QEMU to actually create the target filesystem.
-    rm -rf -- $TESTDIR/overlay
-
-    $testdir/run-qemu \
-	-drive format=raw,index=0,media=disk,file=$TESTDIR/root.btrfs \
-	-drive format=raw,index=1,media=disk,file=$TESTDIR/usr.btrfs \
-	-m 512M  -smp 2 -nographic -net none \
-	-append "root=/dev/fakeroot rw rootfstype=btrfs quiet console=ttyS0,115200n81 selinux=0" \
-	-initrd $TESTDIR/initramfs.makeroot  || return 1
-    grep -F -m 1 -q dracut-root-block-created $TESTDIR/root.btrfs || return 1
-
 
     (
 	export initdir=$TESTDIR/overlay
@@ -270,19 +206,40 @@ EOF
     [ -e /etc/machine-id ] && EXTRA_MACHINE="/etc/machine-id"
     [ -e /etc/machine-info ] && EXTRA_MACHINE+=" /etc/machine-info"
 
-    sudo $basedir/dracut.sh -l -i $TESTDIR/overlay / \
+    sudo /usr/src/packages/BUILD/dracut-*/dracut.sh -l -i $TESTDIR/overlay / \
 	-a "debug systemd i18n" \
 	${EXTRA_MACHINE:+-I "$EXTRA_MACHINE"} \
         -o "dash network plymouth lvm mdraid resume crypt caps dm terminfo usrmount kernel-network-modules" \
 	-d "piix ide-gd_mod ata_piix btrfs sd_mod i6300esb ib700wdt" \
         --no-hostonly-cmdline -N \
-	-f $TESTDIR/initramfs.testing $KVERSION || return 1
+	-f /boot/initramfs.testing $KVERSION || return 1
 
     rm -rf -- $TESTDIR/overlay
+    # delete old config
+    sed -i '6,$d' /etc/grub.d/40_custom
+    # copy boot menu entry
+    sed -n '/### BEGIN \/etc\/grub.d\/10_linux ###/,/submenu/p' /boot/grub2/grub.cfg >> /etc/grub.d/40_custom
+    sed -i '/### BEGIN \/etc\/grub.d\/10_linux ###/d' /etc/grub.d/40_custom
+    sed -i '/submenu/d' /etc/grub.d/40_custom
+    # modify it for testing
+    sed -i "s#menuentry .*#menuentry \'dracut testing\' {#" /etc/grub.d/40_custom
+    sed -i 's#initrd *.*#initrd /boot/initramfs.testing#' /etc/grub.d/40_custom
+    sed -i "/linux/s/\${extra_cmdline.*/panic=1 systemd.log_target=console rd.retry=3 rd.debug console=tty0 rd.shell=0 $DEBUGFAIL/" /etc/grub.d/40_custom
+    sed -i 's/GRUB_TIMEOUT=.*/GRUB_TIMEMOUT=5/' /etc/default/grub
+    # create new grub config
+    grub2-mkconfig -o /boot/grub2/grub.cfg || return 1
+    grub2-reboot "dracut testing"
+    sleep 10
+    echo -e "\n\n*************************"
+    echo "dracut-root-block-created"
+    echo -e "*************************\n"
+
+
 }
 
 test_cleanup() {
+    rm -r $TESTDIR
     return 0
 }
 
-. $testdir/test-functions
+. /usr/src/packages/BUILD/dracut-*/test/test-functions

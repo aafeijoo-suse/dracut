@@ -100,6 +100,10 @@ strstr() { [ "${1##*"$2"*}" != "$1" ]; }
 CMDLINE=$(while read line || [ -n "$line" ]; do echo $line;done < /proc/cmdline)
 plymouth --quit
 exec </dev/console >/dev/console 2>&1
+echo
+echo "*************************"
+echo "dracut-root-block-success"
+
 
 ismounted() {
     while read a m a || [ -n "$m" ]; do
@@ -109,7 +113,7 @@ ismounted() {
 }
 
 if ismounted /usr; then
-    echo "dracut-root-block-success" >/dev/sdc
+    echo "dracut-root-block-success"
 fi
 export TERM=linux
 export PS1='initramfs-test:\w\$ '
@@ -123,4 +127,7 @@ if getargbool 0 rd.shell; then
 fi
 echo "Powering down."
 mount -n -o remount,ro /
-poweroff -f
+echo "Rebooting to next test"
+echo "*************************"
+sleep 10
+echo b > /proc/sysrq-trigger

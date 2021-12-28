@@ -100,6 +100,10 @@ strstr() { [ "${1##*"$2"*}" != "$1" ]; }
 CMDLINE=$(while read line || [ -n "$line" ]; do echo $line;done < /proc/cmdline)
 plymouth --quit
 exec </dev/console >/dev/console 2>&1
+echo
+echo "*************************"
+echo "dracut-root-block-success"
+
 
 ismounted() {
     while read a m a || [ -n "$a" ]; do
@@ -111,7 +115,7 @@ ismounted() {
 systemctl --failed --no-legend --no-pager > /failed
 
 if ismounted /usr && [ ! -s /failed ]; then
-    echo "dracut-root-block-success" >/dev/sdc
+    echo "dracut-root-block-success" 
 fi
 
 journalctl --full --no-pager -o short-monotonic
@@ -135,6 +139,9 @@ if getargbool 0 rd.shell; then
 	strstr "$(setsid --help)" "control" && CTTY="-c"
 	setsid $CTTY sh -i
 fi
-set -x
-/usr/bin/systemctl poweroff
-echo "Powering down."
+mount -n -o remount,ro /
+echo "Rebooting to next test"
+echo "*************************"
+sleep 10
+echo b > /proc/sysrq-trigger
+

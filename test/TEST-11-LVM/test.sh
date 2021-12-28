@@ -6,20 +6,12 @@ KVERSION=${KVERSION-$(uname -r)}
 # Uncomment this to debug failures
 #DEBUGFAIL="rd.break rd.shell"
 
-test_run() {
-    $testdir/run-qemu \
-	-drive format=raw,index=0,media=disk,file=$TESTDIR/root.ext2 \
-	-m 512M  -smp 2 -nographic \
-	-net none \
-        -no-reboot \
-	-append "panic=1 root=/dev/dracut/root rw rd.auto=1 quiet rd.retry=3 rd.info console=ttyS0,115200n81 selinux=0 rd.debug rd.shell=0 $DEBUGFAIL" \
-	-initrd $TESTDIR/initramfs.testing
-    grep -F -m 1 -q dracut-root-block-success $TESTDIR/root.ext2 || return 1
-}
 
 test_setup() {
-    # Create the blank file to use as a root filesystem
-    dd if=/dev/null of=$TESTDIR/root.ext2 bs=1M seek=80
+
+    export basedir=/usr/lib/dracut
+    export initdir=$TESTDIR/overlay
+    mkdir -p $initdir
 
     kernel=$KVERSION
     # Create what will eventually be our root filesystem onto an overlay
@@ -52,30 +44,6 @@ test_setup() {
 	sudo ldconfig -r "$initdir"
     )
 
-    # second, install the files needed to make the root filesystem
-    (
-	export initdir=$TESTDIR/overlay
-	. $basedir/dracut-init.sh
-	inst_multiple sfdisk mke2fs poweroff cp umount
-	inst_hook initqueue 01 ./create-root.sh
-        inst_hook initqueue/finished 01 ./finished-false.sh
-	inst_simple ./99-idesymlinks.rules /etc/udev/rules.d/99-idesymlinks.rules
-    )
-
-    # create an initramfs that will create the target root filesystem.
-    # We do it this way so that we do not risk trashing the host mdraid
-    # devices, volume groups, encrypted partitions, etc.
-    $basedir/dracut.sh -l -i $TESTDIR/overlay / \
-	-m "dash lvm mdraid udev-rules base rootfs-block fs-lib kernel-modules" \
-	-d "piix ide-gd_mod ata_piix ext2 sd_mod" \
-        --no-hostonly-cmdline -N \
-	-f $TESTDIR/initramfs.makeroot $KVERSION || return 1
-    rm -rf -- $TESTDIR/overlay
-    # Invoke KVM and/or QEMU to actually create the target filesystem.
-    $testdir/run-qemu -drive format=raw,index=0,media=disk,file=$TESTDIR/root.ext2 -m 512M  -smp 2 -nographic -net none \
-	-append "root=/dev/fakeroot rw rootfstype=ext2 quiet console=ttyS0,115200n81 selinux=0" \
-	-initrd $TESTDIR/initramfs.makeroot  || return 1
-    grep -F -m 1 -q dracut-root-block-created $TESTDIR/root.ext2 || return 1
     (
 	export initdir=$TESTDIR/overlay
 	. $basedir/dracut-init.sh
@@ -84,16 +52,38 @@ test_setup() {
         inst_hook emergency 000 ./hard-off.sh
 	inst_simple ./99-idesymlinks.rules /etc/udev/rules.d/99-idesymlinks.rules
     )
-    sudo $basedir/dracut.sh -l -i $TESTDIR/overlay / \
+    sudo /usr/src/packages/BUILD/dracut-*/dracut.sh -l -i $TESTDIR/overlay / \
 	-o "plymouth network kernel-network-modules" \
 	-a "debug" \
 	-d "piix ide-gd_mod ata_piix ext2 sd_mod" \
         --no-hostonly-cmdline -N \
-	-f $TESTDIR/initramfs.testing $KVERSION || return 1
+	-f /boot/initramfs.testing $KVERSION || return 1
+
+    rm -rf -- $TESTDIR/overlay
+    # delete old config
+    sed -i '6,$d' /etc/grub.d/40_custom
+    # copy boot menu entry
+    sed -n '/### BEGIN \/etc\/grub.d\/10_linux ###/,/submenu/p' /boot/grub2/grub.cfg >> /etc/grub.d/40_custom
+    sed -i '/### BEGIN \/etc\/grub.d\/10_linux ###/d' /etc/grub.d/40_custom
+    sed -i '/submenu/d' /etc/grub.d/40_custom
+    # modify it for testing
+    sed -i "s#menuentry .*#menuentry \'dracut testing\' {#" /etc/grub.d/40_custom
+    sed -i 's#initrd *.*#initrd /boot/initramfs.testing#' /etc/grub.d/40_custom
+    sed -i "/linux/s/\${extra_cmdline.*/panic=1 systemd.log_target=console rd.retry=3 rd.debug console=tty0 rd.shell=0 $DEBUGFAIL/" /etc/grub.d/40_custom
+    sed -i 's/GRUB_TIMEOUT=.*/GRUB_TIMEMOUT=5/' /etc/default/grub
+    # create new grub config
+    grub2-mkconfig -o /boot/grub2/grub.cfg || return 1
+    grub2-reboot "dracut testing"
+    sleep 10
+    echo -e "\n\n*************************"
+    echo "dracut-root-block-created"
+    echo -e "*************************\n"
+
 }
 
 test_cleanup() {
+    rm -r $TESTDIR
     return 0
 }
 
-. $testdir/test-functions
+. /usr/src/packages/BUILD/dracut-*/test/test-functions

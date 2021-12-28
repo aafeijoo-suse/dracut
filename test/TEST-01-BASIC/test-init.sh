@@ -1,5 +1,10 @@
 #!/bin/sh
 >/dev/watchdog
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+mount -t proc proc /proc
+#mount -t sysfs sys /sys
+#mount -t devtmpfs dev /dev
+
 getcmdline() {
     while read -r _line || [ -n "$_line" ]; do
         printf "%s" "$_line"
@@ -100,7 +105,9 @@ strstr() { [ "${1##*"$2"*}" != "$1" ]; }
 CMDLINE=$(while read line || [ -n "$line" ]; do echo $line;done < /proc/cmdline)
 plymouth --quit
 exec >/dev/console 2>&1
-echo "dracut-root-block-success" >/dev/sdb
+echo
+echo "*************************"
+echo "dracut-root-block-success"
 export TERM=linux
 export PS1='initramfs-test:\w\$ '
 [ -f /etc/mtab ] || ln -sfn /proc/mounts /etc/mtab
@@ -111,6 +118,9 @@ if getargbool 0 rd.shell; then
 	strstr "$(setsid --help)" "control" && CTTY="-c"
 	setsid $CTTY sh -i
 fi
-echo "Powering down."
+
+echo "Rebooting to next test"
+echo "*************************"
+sleep 10
 mount -n -o remount,ro /
-poweroff -f
+echo b > /proc/sysrq-trigger

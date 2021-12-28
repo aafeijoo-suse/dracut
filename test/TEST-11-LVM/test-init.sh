@@ -99,7 +99,10 @@ strstr() { [ "${1##*"$2"*}" != "$1" ]; }
 CMDLINE=$(while read line || [ -n "$line" ]; do echo $line;done < /proc/cmdline)
 plymouth --quit
 exec >/dev/console 2>&1
-echo "dracut-root-block-success" >/dev/sda1
+echo
+echo "*************************"
+echo "dracut-root-block-success"
+
 export TERM=linux
 export PS1='initramfs-test:\w\$ '
 [ -f /etc/mtab ] || ln -sfn /proc/mounts /etc/mtab
@@ -109,4 +112,7 @@ echo "made it to the rootfs!"
 getargbool 0 rd.shell && sh -i
 echo "Powering down."
 mount -n -o remount,ro /
-poweroff -f
+echo "Rebooting to next test"
+echo "*************************"
+sleep 10
+echo b > /proc/sysrq-trigger
