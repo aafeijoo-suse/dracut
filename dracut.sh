@@ -19,6 +19,7 @@
 #
 
 # store for logging
+DRACUT_INSTALL="/usr/lib/dracut/dracut-install"
 
 unset BASH_ENV
 unset GZIP
