@@ -6,6 +6,9 @@
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 command -v plymouth > /dev/null 2>&1 && plymouth --quit
 exec > /dev/console 2>&1
+echo
+echo "*************************"
+echo "dracut-root-block-success"
 
 systemctl --failed --no-legend --no-pager > /failed
 
@@ -21,7 +24,7 @@ else
         echo "**************************FAILED**************************"
 
     else
-        echo "dracut-root-block-success" | dd oflag=direct,dsync of=/dev/disk/by-id/ata-disk_marker
+        echo "dracut-root-block-success"
         echo "All OK"
     fi
 fi
@@ -36,6 +39,8 @@ if getargbool 0 rd.shell; then
     strstr "$(setsid --help)" "control" && CTTY="-c"
     setsid $CTTY sh -i
 fi
-echo "Powering down."
-systemctl --no-block poweroff
-exit 0
+echo "Rebooting to next test"
+echo "*************************"
+sleep 10
+mount -n -o remount,ro /
+echo b > /proc/sysrq-trigger
