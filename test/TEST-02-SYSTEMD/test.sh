@@ -4,23 +4,7 @@ TEST_DESCRIPTION="root filesystem on a ext3 filesystem"
 
 KVERSION="${KVERSION-$(uname -r)}"
 
-# Uncomment this to debug failures
-#DEBUGFAIL="rd.shell=1 rd.break=pre-mount"
-test_run() {
-    dd if=/dev/zero of="$TESTDIR"/marker.img bs=1MiB count=1
-    declare -a disk_args=()
-    # shellcheck disable=SC2034
-    declare -i disk_index=0
-    qemu_add_drive_args disk_index disk_args "$TESTDIR"/marker.img marker
-    qemu_add_drive_args disk_index disk_args "$TESTDIR"/root.img root
-
-    "$testdir"/run-qemu \
-        "${disk_args[@]}" \
-        -append "panic=1 oops=panic softlockup_panic=1 systemd.crash_reboot root=LABEL=dracut rw loglevel=77 systemd.log_level=debug systemd.log_target=console rd.retry=3 rd.info console=ttyS0,115200n81 selinux=0 init=/sbin/init rd.shell=0 $DEBUGFAIL" \
-        -initrd "$TESTDIR"/initramfs.testing || return 1
-
-    grep -U --binary-files=binary -F -m 1 -q dracut-root-block-success "$TESTDIR"/marker.img
-}
+export basedir=/usr/lib/dracut
 
 test_setup() {
     kernel=$KVERSION
@@ -73,33 +57,6 @@ test_setup() {
         inst_hook initqueue/finished 01 ./finished-false.sh
     )
 
-    # create an initramfs that will create the target root filesystem.
-    # We do it this way so that we do not risk trashing the host mdraid
-    # devices, volume groups, encrypted partitions, etc.
-    "$basedir"/dracut.sh -l -i "$TESTDIR"/overlay / \
-        -m "dash udev-rules base rootfs-block fs-lib kernel-modules qemu" \
-        -d "piix ide-gd_mod ata_piix ext3 sd_mod" \
-        --nomdadmconf \
-        --no-hostonly-cmdline -N \
-        -f "$TESTDIR"/initramfs.makeroot "$KVERSION" || return 1
-    rm -rf -- "$TESTDIR"/overlay
-
-    dd if=/dev/zero of="$TESTDIR"/root.img bs=1MiB count=80
-    dd if=/dev/zero of="$TESTDIR"/marker.img bs=1MiB count=1
-    declare -a disk_args=()
-    # shellcheck disable=SC2034
-    declare -i disk_index=0
-    qemu_add_drive_args disk_index disk_args "$TESTDIR"/marker.img marker
-    qemu_add_drive_args disk_index disk_args "$TESTDIR"/root.img root
-
-    # Invoke KVM and/or QEMU to actually create the target filesystem.
-    "$testdir"/run-qemu \
-        "${disk_args[@]}" \
-        -append "root=/dev/fakeroot rw rootfstype=ext3 quiet console=ttyS0,115200n81 selinux=0" \
-        -initrd "$TESTDIR"/initramfs.makeroot || return 1
-    grep -U --binary-files=binary -F -m 1 -q dracut-root-block-created "$TESTDIR"/marker.img || return 1
-    rm -- "$TESTDIR"/marker.img
-
     (
         # shellcheck disable=SC2031
         export initdir=$TESTDIR/overlay
@@ -110,19 +67,40 @@ test_setup() {
         inst_hook pre-pivot 000 ./systemd-analyze.sh
         inst_hook emergency 000 ./hard-off.sh
     )
-    "$basedir"/dracut.sh -l -i "$TESTDIR"/overlay / \
+    # shellcheck disable=SC2211
+    /usr/src/packages/BUILD/dracut-*/dracut.sh -l -i "$TESTDIR"/overlay / \
         -a "debug systemd" \
         -o "network kernel-network-modules" \
         -d "piix ide-gd_mod ata_piix ext3 sd_mod" \
         --no-hostonly-cmdline -N \
-        -f "$TESTDIR"/initramfs.testing "$KVERSION" || return 1
+        -f /boot/initramfs.testing "$KVERSION" || return 1
 
     #       -o "plymouth network md dmraid multipath fips caps crypt btrfs resume dmsquash-live dm"
+
+    # delete old config
+    sed -i '6,$d' /etc/grub.d/40_custom
+    # copy boot menu entry
+    sed -n '/### BEGIN \/etc\/grub.d\/10_linux ###/,/submenu/p' /boot/grub2/grub.cfg >> /etc/grub.d/40_custom
+    sed -i '/### BEGIN \/etc\/grub.d\/10_linux ###/d' /etc/grub.d/40_custom
+    sed -i '/submenu/d' /etc/grub.d/40_custom
+    # modify it for testing
+    sed -i "s#menuentry .*#menuentry \'dracut testing\' {#" /etc/grub.d/40_custom
+    sed -i 's#initrd *.*#initrd /boot/initramfs.testing#' /etc/grub.d/40_custom
+    sed -i "/linux/s/\${extra_cmdline.*/panic=1 systemd.log_target=console rd.retry=3 rd.debug console=tty0 rd.shell=0 $DEBUGFAIL/" /etc/grub.d/40_custom
+    sed -i 's/GRUB_TIMEOUT=.*/GRUB_TIMEMOUT=5/' /etc/default/grub
+    # create new grub config
+    grub2-mkconfig -o /boot/grub2/grub.cfg || return 1
+    grub2-reboot "dracut testing"
+    sleep 10
+    echo -e "\n\n*************************"
+    echo "dracut-root-block-created"
+    echo -e "*************************\n"
 }
 
 test_cleanup() {
+    rm -r "$TESTDIR"
     return 0
 }
 
 # shellcheck disable=SC1090
-. "$testdir"/test-functions
+. /usr/src/packages/BUILD/dracut-*/test/test-functions
