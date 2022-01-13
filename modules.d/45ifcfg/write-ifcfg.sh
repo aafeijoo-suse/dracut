@@ -168,14 +168,14 @@ for netup in /tmp/net.*.did-setup ; do
         echo "NETBOOT=yes"
         echo "UUID=\"$uuid\""
         strstr "$(ip -6 addr show dev $netif)" 'inet6' && echo "IPV6INIT=yes"
-        if [ -f /tmp/dhclient.$netif.lease ]; then
+        if [ -f /tmp/dhclient.$netif.lease ] || [ -n "$(ls "/tmp/leaseinfo.${netif}"* 2> /dev/null)" ]; then
             [ -f /tmp/dhclient.$netif.dhcpopts ] && . /tmp/dhclient.$netif.dhcpopts
             if [ -f /tmp/net.$netif.has_ibft_config ]; then
                 echo "BOOTPROTO=ibft"
             else
                 echo "BOOTPROTO=dhcp"
             fi
-            cp /tmp/dhclient.$netif.lease /tmp/ifcfg-leases/dhclient-$uuid-$netif.lease
+            cp /tmp/dhclient.$netif.lease /tmp/ifcfg-leases/dhclient-$uuid-$netif.lease 2>/dev/null
         else
             # If we've booted with static ip= lines, the override file is there
             [ -e /tmp/net.$netif.override ] && . /tmp/net.$netif.override
