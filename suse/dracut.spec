@@ -44,7 +44,6 @@ BuildRequires:  cargo
 BuildRequires:  rust
 Requires:       %{_bindir}/get_kernel_version
 Requires:       bash
-# systemd-sysvinit provides: poweroff, reboot, halt
 Requires:       coreutils
 Requires(post): coreutils
 Requires:       cpio
@@ -58,7 +57,6 @@ Requires:       modutils
 Requires:       pigz
 Requires:       sed
 Requires:       systemd >= 219
-Requires:       systemd-sysvinit
 Requires:       udev > 166
 Requires:       util-linux >= 2.21
 Requires:       util-linux-systemd >= 2.36.2
