@@ -14,7 +14,7 @@ check() {
 # Module dependency requirements.
 depends() {
     # This module has external dependency on other module(s).
-    echo systemd-journald systemd-modules-load systemd-sysctl
+    echo systemd-ask-password systemd-journald systemd-modules-load systemd-sysctl
     # Return 0 to include the dependent module(s) in the initramfs.
     return 0
 }
@@ -83,11 +83,8 @@ install() {
         "$systemdsystemunitdir"/kmod-static-nodes.service \
         "$systemdsystemunitdir"/systemd-tmpfiles-setup.service \
         "$systemdsystemunitdir"/systemd-tmpfiles-setup-dev.service \
-        "$systemdsystemunitdir"/systemd-ask-password-console.path \
         "$systemdsystemunitdir"/systemd-udevd-control.socket \
         "$systemdsystemunitdir"/systemd-udevd-kernel.socket \
-        "$systemdsystemunitdir"/systemd-ask-password-plymouth.path \
-        "$systemdsystemunitdir"/systemd-ask-password-console.service \
         "$systemdsystemunitdir"/systemd-halt.service \
         "$systemdsystemunitdir"/systemd-poweroff.service \
         "$systemdsystemunitdir"/systemd-reboot.service \
@@ -96,13 +93,11 @@ install() {
         "$systemdsystemunitdir"/systemd-udevd.service \
         "$systemdsystemunitdir"/systemd-udev-trigger.service \
         "$systemdsystemunitdir"/systemd-udev-settle.service \
-        "$systemdsystemunitdir"/systemd-ask-password-plymouth.service \
         "$systemdsystemunitdir"/systemd-vconsole-setup.service \
         "$systemdsystemunitdir"/systemd-volatile-root.service \
         "$systemdsystemunitdir"/systemd-random-seed-load.service \
         "$systemdsystemunitdir"/systemd-random-seed.service \
         \
-        "$systemdsystemunitdir"/sysinit.target.wants/systemd-ask-password-console.path \
         "$systemdsystemunitdir"/sockets.target.wants/systemd-udevd-control.socket \
         "$systemdsystemunitdir"/sockets.target.wants/systemd-udevd-kernel.socket \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-udevd.service \
@@ -128,7 +123,6 @@ install() {
         mount umount reboot poweroff \
         systemd-run systemd-escape \
         systemd-cgls systemd-tmpfiles \
-        systemd-ask-password systemd-tty-ask-password-agent \
         /etc/udev/udev.hwdb
 
     if [[ $hostonly ]]; then
@@ -195,9 +189,7 @@ EOF
 
     for i in \
         emergency.target \
-        rescue.target \
-        systemd-ask-password-console.service \
-        systemd-ask-password-plymouth.service; do
+        rescue.target; do
         [[ -f "$systemdsystemunitdir"/$i ]] || continue
         $SYSTEMCTL -q --root "$initdir" add-wants "$i" systemd-vconsole-setup.service
     done
