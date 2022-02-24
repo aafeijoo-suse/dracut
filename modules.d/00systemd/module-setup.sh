@@ -11,17 +11,21 @@ check() {
     return 255
 }
 
-# called by dracut
+# Module dependency requirements.
 depends() {
+    # This module has external dependency on other module(s).
+    echo systemd-journald
+    # Return 0 to include the dependent module(s) in the initramfs.
     return 0
 }
 
+# Install kernel module(s).
 installkernel() {
     hostonly='' instmods autofs4 ipv6 algif_hash hmac sha256
     instmods -s efivarfs
 }
 
-# called by dracut
+# Install the required file(s) and directories for the module in the initramfs.
 install() {
     local _mods
 
@@ -38,7 +42,6 @@ install() {
         "$systemdutildir"/systemd-reply-password \
         "$systemdutildir"/systemd-fsck \
         "$systemdutildir"/systemd-udevd \
-        "$systemdutildir"/systemd-journald \
         "$systemdutildir"/systemd-sysctl \
         "$systemdutildir"/systemd-modules-load \
         "$systemdutildir"/systemd-vconsole-setup \
@@ -88,8 +91,6 @@ install() {
         "$systemdsystemunitdir"/systemd-udevd-control.socket \
         "$systemdsystemunitdir"/systemd-udevd-kernel.socket \
         "$systemdsystemunitdir"/systemd-ask-password-plymouth.path \
-        "$systemdsystemunitdir"/systemd-journald.socket \
-        "$systemdsystemunitdir"/systemd-journald-audit.socket \
         "$systemdsystemunitdir"/systemd-ask-password-console.service \
         "$systemdsystemunitdir"/systemd-modules-load.service \
         "$systemdsystemunitdir"/systemd-halt.service \
@@ -101,7 +102,6 @@ install() {
         "$systemdsystemunitdir"/systemd-udev-trigger.service \
         "$systemdsystemunitdir"/systemd-udev-settle.service \
         "$systemdsystemunitdir"/systemd-ask-password-plymouth.service \
-        "$systemdsystemunitdir"/systemd-journald.service \
         "$systemdsystemunitdir"/systemd-vconsole-setup.service \
         "$systemdsystemunitdir"/systemd-volatile-root.service \
         "$systemdsystemunitdir"/systemd-random-seed-load.service \
@@ -110,12 +110,8 @@ install() {
         \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-modules-load.service \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-ask-password-console.path \
-        "$systemdsystemunitdir"/sysinit.target.wants/systemd-journald.service \
         "$systemdsystemunitdir"/sockets.target.wants/systemd-udevd-control.socket \
         "$systemdsystemunitdir"/sockets.target.wants/systemd-udevd-kernel.socket \
-        "$systemdsystemunitdir"/sockets.target.wants/systemd-journald.socket \
-        "$systemdsystemunitdir"/sockets.target.wants/systemd-journald-audit.socket \
-        "$systemdsystemunitdir"/sockets.target.wants/systemd-journald-dev-log.socket \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-udevd.service \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-udev-trigger.service \
         "$systemdsystemunitdir"/sysinit.target.wants/kmod-static-nodes.service \
@@ -134,7 +130,7 @@ install() {
         \
         "$tmpfilesdir"/systemd.conf \
         \
-        journalctl systemctl \
+        systemctl \
         echo swapoff \
         kmod insmod rmmod modprobe modinfo depmod lsmod \
         mount umount reboot poweroff \
@@ -170,8 +166,6 @@ install() {
 
     if [[ $hostonly ]]; then
         inst_multiple -H -o \
-            /etc/systemd/journald.conf \
-            /etc/systemd/journald.conf.d/*.conf \
             /etc/systemd/system.conf \
             /etc/systemd/system.conf.d/*.conf \
             /etc/hosts \
@@ -194,17 +188,14 @@ install() {
         : > "$initdir/etc/machine-id"
     fi
 
-    # install adm user/group for journald
     inst_multiple nologin
     {
-        grep '^systemd-journal:' "$dracutsysrootdir"/etc/passwd 2> /dev/null
         grep '^adm:' "$dracutsysrootdir"/etc/passwd 2> /dev/null
         # we don't use systemd-networkd, but the user is in systemd.conf tmpfiles snippet
         grep '^systemd-network:' "$dracutsysrootdir"/etc/passwd 2> /dev/null
     } >> "$initdir/etc/passwd"
 
     {
-        grep '^systemd-journal:' "$dracutsysrootdir"/etc/group 2> /dev/null
         grep '^wheel:' "$dracutsysrootdir"/etc/group 2> /dev/null
         grep '^adm:' "$dracutsysrootdir"/etc/group 2> /dev/null
         grep '^utmp:' "$dracutsysrootdir"/etc/group 2> /dev/null
@@ -249,15 +240,6 @@ EOF
         [[ -f "$systemdsystemunitdir"/$i ]] || continue
         $SYSTEMCTL -q --root "$initdir" add-wants "$i" systemd-vconsole-setup.service
     done
-
-    mkdir -p "$initdir/etc/systemd"
-    # We must use a volatile journal, and we don't want rate-limiting
-    {
-        echo "[Journal]"
-        echo "Storage=volatile"
-        echo "RateLimitInterval=0"
-        echo "RateLimitBurst=0"
-    } >> "$initdir/etc/systemd/journald.conf"
 
     $SYSTEMCTL -q --root "$initdir" set-default multi-user.target
 
