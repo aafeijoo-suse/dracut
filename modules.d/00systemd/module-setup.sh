@@ -123,12 +123,12 @@ install() {
         mount umount reboot poweroff \
         systemd-run systemd-escape \
         systemd-cgls systemd-tmpfiles \
-        /etc/udev/udev.hwdb
+        "$udevdir"/udev.hwdb
 
     if [[ $hostonly ]]; then
         inst_multiple -H -o \
-            /etc/systemd/system.conf \
-            /etc/systemd/system.conf.d/*.conf \
+            "$systemdutilconfdir"/system.conf \
+            "$systemdutilconfdir/system.conf.d/*.conf" \
             /etc/hosts \
             /etc/hostname \
             /etc/nsswitch.conf \
@@ -136,7 +136,7 @@ install() {
             /etc/machine-info \
             /etc/vconsole.conf \
             /etc/locale.conf \
-            /etc/udev/udev.conf
+            "$udevdir"/udev.conf
     fi
 
     if ! [[ -e "$initdir/etc/machine-id" ]]; then
