@@ -14,7 +14,7 @@ check() {
 # Module dependency requirements.
 depends() {
     # This module has external dependency on other module(s).
-    echo systemd-journald systemd-modules-load
+    echo systemd-journald systemd-modules-load systemd-sysctl
     # Return 0 to include the dependent module(s) in the initramfs.
     return 0
 }
@@ -40,7 +40,6 @@ install() {
         "$systemdutildir"/systemd-reply-password \
         "$systemdutildir"/systemd-fsck \
         "$systemdutildir"/systemd-udevd \
-        "$systemdutildir"/systemd-sysctl \
         "$systemdutildir"/systemd-vconsole-setup \
         "$systemdutildir"/systemd-volatile-root \
         "$systemdutildir"/system-generators/systemd-debug-generator \
@@ -102,7 +101,6 @@ install() {
         "$systemdsystemunitdir"/systemd-volatile-root.service \
         "$systemdsystemunitdir"/systemd-random-seed-load.service \
         "$systemdsystemunitdir"/systemd-random-seed.service \
-        "$systemdsystemunitdir"/systemd-sysctl.service \
         \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-ask-password-console.path \
         "$systemdsystemunitdir"/sockets.target.wants/systemd-udevd-control.socket \
@@ -112,7 +110,6 @@ install() {
         "$systemdsystemunitdir"/sysinit.target.wants/kmod-static-nodes.service \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-tmpfiles-setup.service \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-tmpfiles-setup-dev.service \
-        "$systemdsystemunitdir"/sysinit.target.wants/systemd-sysctl.service \
         \
         "$systemdsystemunitdir"/ctrl-alt-del.target \
         "$systemdsystemunitdir"/reboot.target \
@@ -134,9 +131,6 @@ install() {
         systemd-ask-password systemd-tty-ask-password-agent \
         /etc/udev/udev.hwdb
 
-    inst_multiple -o \
-        /usr/lib/sysctl.d/*.conf
-
     if [[ $hostonly ]]; then
         inst_multiple -H -o \
             /etc/systemd/system.conf \
@@ -148,8 +142,6 @@ install() {
             /etc/machine-info \
             /etc/vconsole.conf \
             /etc/locale.conf \
-            /etc/sysctl.d/*.conf \
-            /etc/sysctl.conf \
             /etc/udev/udev.conf
     fi
 
