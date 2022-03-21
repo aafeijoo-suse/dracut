@@ -210,10 +210,52 @@ if [[ $hostonly == "-h" ]]; then
 fi
 
 [[ $DRACUT_RESOLVE_LAZY ]] || export DRACUT_RESOLVE_DEPS=1
+
+inst_from_rpm() {
+    local _ret=0
+    local _target
+    while [ $# -gt 0 ]; do
+        if [[ $1 == "-H" || $1 == "-o" ]]; then
+            shift
+            continue
+        fi
+        _target=$1
+        if [[ ! -d "$_target" && ! -e "$_target" ]]; then
+            _target=$(command -v "$_target")
+        fi
+        if [[ ! -e "$_target" ]]; then
+            _ret=1
+            shift
+            continue
+        fi
+        _target=$(rpm -qf "$_target" 2> /dev/null)
+        if [[ -z "$_target" ]]; then
+            _ret=1
+            shift
+            continue
+        fi
+        _target=${_target%-*}
+        _target=${_target%-*}
+        # if ! zypper -n --root "$rpmdir" in "$_target"; then
+        if ! dnf install -y --installroot="$rpmdir" "$_target"; then
+            _ret=1
+        fi
+        shift
+    done
+    return $_ret
+}
+
 inst_dir() {
-    [[ -e ${initdir}/"$1" ]] && return 0 # already there
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} -d "$@"; then
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} -d "$@"
+    if [[ -n $install_from_rpm ]]; then
+        [[ -e ${rpmdir}/"$1" ]] && return 0 # already there
+        if ! inst_from_rpm "$@"; then
+            derror FAILED: inst_dir "$@"
+        fi
+    else
+        [[ -e ${initdir}/"$1" ]] && return 0 # already there
+        if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} -d "$@"; then
+            derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} -d "$@"
+        fi
     fi
 }
 
@@ -225,8 +267,8 @@ inst() {
     fi
     [[ -e ${initdir}/"${2:-$1}" ]] && return 0 # already there
     # shellcheck disable=SC2154
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"; then
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"
+    if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"; then
+        derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"
     fi
 }
 
@@ -238,8 +280,8 @@ inst_simple() {
     fi
     [[ -e ${initdir}/"${2:-$1}" ]] && return 0 # already there
     [[ -e $1 ]] || return 1                    # no source
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${_hostonly_install:+-H} "$@"; then
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${_hostonly_install:+-H} "$@" || :
+    if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${_hostonly_install:+-H} "$@"; then
+        derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${_hostonly_install:+-H} "$@" || :
     fi
 }
 
@@ -251,20 +293,29 @@ inst_symlink() {
     fi
     [[ -e ${initdir}/"${2:-$1}" ]] && return 0 # already there
     [[ -L $1 ]] || return 1
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"; then
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@" || :
+    if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"; then
+        derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@" || :
     fi
 }
 
 inst_multiple() {
     local _ret
-    if "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} -a ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@"; then
-        return 0
+    if [[ -n $install_from_rpm ]]; then
+        if inst_from_rpm "$@"; then
+            _ret=0
+        else
+            _ret=$?
+            derror FAILED: inst_multiple "$@" || :
+        fi
     else
-        _ret=$?
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} -a ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@" || :
-        return $_ret
+        if "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} -a ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@"; then
+            _ret=0
+        else
+            _ret=$?
+            derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} -a ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@" || :
+        fi
     fi
+    return $_ret
 }
 
 dracut_install() {
@@ -282,10 +333,10 @@ dracut_instmods() {
 
     # shellcheck disable=SC2154
     if ! "$DRACUT_INSTALL" \
-        ${dracutsysrootdir:+-r "$dracutsysrootdir"} \
+        ${installrootdir:+-r "$installrootdir"} \
         ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${hostonly:+-H} ${check_supported:+--check-supported} ${omit_drivers:+-N "$omit_drivers"} ${srcmods:+--kerneldir "$srcmods"} -m "$@"; then
         if ((_silent == 0)); then
-            derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${hostonly:+-H} ${check_supported:+--check-supported} ${omit_drivers:+-N "$omit_drivers"} ${srcmods:+--kerneldir "$srcmods"} -m "$@" || :
+            derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${hostonly:+-H} ${check_supported:+--check-supported} ${omit_drivers:+-N "$omit_drivers"} ${srcmods:+--kerneldir "$srcmods"} -m "$@" || :
         fi
     fi
 }
@@ -298,27 +349,27 @@ inst_library() {
     fi
     [[ -e ${initdir}/"${2:-$1}" ]] && return 0 # already there
     [[ -e $1 ]] || return 1                    # no source
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"; then
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@" || :
+    if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@"; then
+        derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} ${_hostonly_install:+-H} "$@" || :
     fi
 }
 
 inst_binary() {
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@"; then
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@" || :
+    if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@"; then
+        derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@" || :
     fi
 }
 
 inst_script() {
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@"; then
-        derror FAILED: "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@" || :
+    if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@"; then
+        derror FAILED: "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$@" || :
     fi
 }
 
 inst_fsck_help() {
     local _helper="/run/dracut/fsck/fsck_help_$1.txt"
-    if ! "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$2" "$_helper"; then
-        derror "$DRACUT_INSTALL" ${dracutsysrootdir:+-r "$dracutsysrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$2" "$_helper" || :
+    if ! "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$2" "$_helper"; then
+        derror "$DRACUT_INSTALL" ${installrootdir:+-r "$installrootdir"} ${initdir:+-D "$initdir"} ${loginstall:+-L "$loginstall"} ${DRACUT_RESOLVE_DEPS:+-l} ${DRACUT_FIPS_MODE:+-f} "$2" "$_helper" || :
     fi
 }
 
@@ -430,14 +481,14 @@ inst_rule_group_owner() {
     # shellcheck disable=SC2013
     for i in $(sed -nr 's/.*OWNER=?"([^ "]+).*/\1/p' "$1"); do
         if ! grep -Eq "^$i:" "$initdir/etc/passwd" 2> /dev/null; then
-            grep -E "^$i:" "$dracutsysrootdir"/etc/passwd 2> /dev/null >> "$initdir/etc/passwd"
+            grep -E "^$i:" "$installrootdir"/etc/passwd 2> /dev/null >> "$initdir/etc/passwd"
         fi
     done
 
     # shellcheck disable=SC2013
     for i in $(sed -nr 's/.*GROUP=?"([^ "]+).*/\1/p' "$1"); do
         if ! grep -Eq "^$i:" "$initdir/etc/group" 2> /dev/null; then
-            grep -E "^$i:" "$dracutsysrootdir"/etc/group 2> /dev/null >> "$initdir/etc/group"
+            grep -E "^$i:" "$installrootdir"/etc/group 2> /dev/null >> "$initdir/etc/group"
         fi
     done
 }
@@ -773,6 +824,32 @@ module_cmdline() {
     fi
 }
 
+# module_install_rpm <dracut module> [<module path>]
+# execute the install() function of module-setup.sh of <dracut module>
+# or the "install" script, if module-setup.sh is not found
+module_install_rpm() {
+    local _moddir=$2
+    local _inst=()
+    [[ -z $_moddir ]] && _moddir=$(dracut_module_path "$1")
+    [[ -d $_moddir ]] || return 1
+    if [[ ! -f $_moddir/module-setup.sh ]]; then
+        # shellcheck disable=SC1090
+        if [[ -x $_moddir/install ]]; then
+            mapfile -t _inst < <(type "$_moddir/install" | sed '1,3d;$d' | grep -E '^\s*inst_(dir|multiple)' | sed 's/;$//')
+        fi
+    else
+        unset check depends cmdline install installkernel
+        install() { true; }
+        # shellcheck disable=SC1090
+        . "$_moddir"/module-setup.sh
+        mapfile -t _inst < <(type install | sed '1,3d;$d' | grep -E '^\s*inst_(dir|multiple)' | sed 's/;$//')
+        unset check depends cmdline install installkernel
+    fi
+    for ((i=0; i<${#_inst[@]}; i++)); do
+        ${_inst[$i]}
+    done
+}
+
 # module_install <dracut module> [<module path>]
 # execute the install() function of module-setup.sh of <dracut module>
 # or the "install" script, if module-setup.sh is not found
@@ -1046,7 +1123,7 @@ instmods() {
 
     "$DRACUT_INSTALL" \
         ${initdir:+-D "$initdir"} \
-        ${dracutsysrootdir:+-r "$dracutsysrootdir"} \
+        ${installrootdir:+-r "$installrootdir"} \
         ${loginstall:+-L "$loginstall"} \
         ${hostonly:+-H} \
         ${check_supported:+--check-supported} \
@@ -1061,7 +1138,7 @@ instmods() {
         derror "FAILED: " \
             "$DRACUT_INSTALL" \
             ${initdir:+-D "$initdir"} \
-            ${dracutsysrootdir:+-r "$dracutsysrootdir"} \
+            ${installrootdir:+-r "$installrootdir"} \
             ${loginstall:+-L "$loginstall"} \
             ${hostonly:+-H} \
                 ${check_supported:+--check-supported} \

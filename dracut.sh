@@ -229,6 +229,7 @@ Creates initial ramdisk images for preloading modules
   --no-compress         Do not compress the generated initramfs.  This will
                          override any other compression options.
   --enhanced-cpio       Attempt to reflink cpio file data using dracut-cpio.
+  --install-from-rpm    Install files from their RPM packages.
   --list-modules        List all available dracut modules.
   -M, --show-modules    Print included module's name to standard output during
                          build.
@@ -422,6 +423,7 @@ rearrange_params() {
             --long no-compress \
             --long gzip \
             --long enhanced-cpio \
+            --long install-from-rpm \
             --long list-modules \
             --long show-modules \
             --long keep \
@@ -784,6 +786,7 @@ while :; do
         --no-compress) _no_compress_l="cat" ;;
         --gzip) compress_l="gzip" ;;
         --enhanced-cpio) enhanced_cpio_l="yes" ;;
+        --install-from-rpm) install_from_rpm_l="yes" ;;
         --list-modules) do_list="yes" ;;
         -M | --show-modules)
             show_modules_l="yes"
@@ -1006,6 +1009,7 @@ stdloglvl=$((stdloglvl + verbosity_mod_l))
 [[ $INITRD_COMPRESS ]] && compress=$INITRD_COMPRESS
 [[ $compress_l ]] && compress=$compress_l
 [[ $enhanced_cpio_l ]] && enhanced_cpio=$enhanced_cpio_l
+[[ $install_from_rpm_l ]] && install_from_rpm=$install_from_rpm_l
 [[ $show_modules_l ]] && show_modules=$show_modules_l
 [[ $nofscks_l ]] && nofscks="yes"
 [[ $ro_mnt_l ]] && ro_mnt="yes"
@@ -1175,6 +1179,10 @@ trap 'exit 1;' SIGINT
 
 readonly initdir="${DRACUT_TMPDIR}/initramfs"
 mkdir -p "$initdir"
+if [[ -n $install_from_rpm ]]; then
+    readonly rpmdir="${DRACUT_TMPDIR}/rpm"
+    mkdir -p "$rpmdir"
+fi
 
 # shellcheck disable=SC2154
 if [[ $early_microcode == yes ]] || { [[ $acpi_override == yes ]] && [[ -d $acpi_table_dir ]]; }; then
@@ -1810,7 +1818,7 @@ fi
 
 [[ -d $dracutsysrootdir$depmodconfdir ]] || depmodconfdir=/etc/depmod.d
 
-export initdir dracutbasedir \
+export initdir rpmdir dracutbasedir \
     dracutmodules force_add_dracutmodules add_dracutmodules omit_dracutmodules \
     mods_to_load \
     fw_dir drivers_dir debug no_kernel kernel_only \
@@ -1859,6 +1867,40 @@ if [[ $print_cmdline ]]; then
     printf "\n"
     exit 0
 fi
+
+# get required rpm packages.
+installrootdir="$dracutsysrootdir"
+modulesdir="$dracutbasedir/modules.d"
+if [[ -n $install_from_rpm ]]; then
+    if [[ $no_kernel != yes ]]; then
+        dinfo "RPM: kernel packages"
+        if ! inst_from_rpm "/lib/modules/$kernel"; then
+            dfatal "Failed to install kernel from RPM"
+            exit 1
+        fi
+    fi
+    dinfo "RPM: dracut packages"
+    if ! inst_from_rpm "dracut"; then
+        dfatal "Failed to install dracut from RPM"
+        exit 1
+    fi
+    if [[ $kernel_only != yes ]]; then
+        for moddir in "$modulesdir"/[0-9][0-9]*; do
+            _d_mod=${moddir##*/}
+            _d_mod=${_d_mod#[0-9][0-9]}
+            [[ $mods_to_load == *\ $_d_mod\ * ]] || continue
+            dinfo "RPM: module $_d_mod packages"
+            module_install_rpm "$_d_mod" "$moddir"
+        done
+    fi
+    installrootdir="$rpmdir"
+    modulesdir="$rpmdir/usr/lib/dracut/modules.d"
+    srcmods="$rpmdir/lib/modules/$kernel/"
+    export srcmods
+    unset moddir
+    unset install_from_rpm
+fi
+export installrootdir
 
 # Create some directory structure first
 # shellcheck disable=SC2174
@@ -1932,7 +1974,7 @@ fi
 _isize=0 #initramfs size
 modules_loaded=" "
 # source our modules.
-for moddir in "$dracutbasedir/modules.d"/[0-9][0-9]*; do
+for moddir in "$modulesdir"/[0-9][0-9]*; do
     _d_mod=${moddir##*/}
     _d_mod=${_d_mod#[0-9][0-9]}
     [[ $mods_to_load == *\ $_d_mod\ * ]] || continue
