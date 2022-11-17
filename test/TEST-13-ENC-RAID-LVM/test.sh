@@ -131,7 +131,7 @@ test_setup() {
     cryptoUUIDS=$(grep -F --binary-files=text -m 3 ID_FS_UUID "$TESTDIR"/marker.img)
     for uuid in $cryptoUUIDS; do
         eval "$uuid"
-        printf ' rd.luks.uuid=luks-%s ' "$ID_FS_UUID"
+        printf ' rd.luks.uuid=luksLVM-%s ' "$ID_FS_UUID"
     done > "$TESTDIR"/luks.txt
 
     (
@@ -147,7 +147,7 @@ test_setup() {
         i=1
         for uuid in $cryptoUUIDS; do
             eval "$uuid"
-            printf 'luks-%s /dev/disk/by-id/ata-disk_disk%s /etc/key timeout=0\n' "$ID_FS_UUID" $i
+            printf 'luksLVM-%s /dev/disk/by-id/ata-disk_disk%s /etc/key timeout=0\n' "$ID_FS_UUID" $i
             ((i += 1))
         done > "$initdir"/etc/crypttab
         echo -n test > "$initdir"/etc/key
