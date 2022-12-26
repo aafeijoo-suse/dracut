@@ -24,7 +24,7 @@
 %endif
 
 Name:           dracut
-Version:        057
+Version:        059
 Release:        0
 Summary:        Event driven initramfs infrastructure
 License:        GPLv2+ and LGPLv2+ and GPLv2
@@ -41,6 +41,7 @@ BuildRequires:  pkgconfig(libkmod)
 BuildRequires:  pkgconfig(systemd) >= 219
 BuildRequires:  cargo
 BuildRequires:  rust
+Requires:       awk
 Requires:       %{_bindir}/get_kernel_version
 Requires:       bash
 Requires:       coreutils
@@ -56,6 +57,7 @@ Requires:       modutils
 Requires:       pigz
 Requires:       sed
 Requires:       systemd >= 219
+Recommends:     (tpm2.0-tools if tpm2-0-tss)
 Requires:       udev > 166
 Requires:       util-linux >= 2.21
 Requires:       util-linux-systemd >= 2.36.2
@@ -355,6 +357,9 @@ fi
 %{dracutlibdir}/modules.d/01systemd-ldconfig
 %{dracutlibdir}/modules.d/01systemd-modules-load
 %{dracutlibdir}/modules.d/01systemd-networkd
+%{dracutlibdir}/modules.d/01systemd-pcrphase
+%{dracutlibdir}/modules.d/01systemd-portabled
+%{dracutlibdir}/modules.d/01systemd-pstore
 %{dracutlibdir}/modules.d/01systemd-repart
 %{dracutlibdir}/modules.d/01systemd-resolved
 %{dracutlibdir}/modules.d/01systemd-rfkill
@@ -399,6 +404,7 @@ fi
 %{dracutlibdir}/modules.d/90dm
 %{dracutlibdir}/modules.d/90dmraid
 %{dracutlibdir}/modules.d/90dmsquash-live
+%{dracutlibdir}/modules.d/90dmsquash-live-autooverlay
 %{dracutlibdir}/modules.d/90dmsquash-live-ntfs
 %{dracutlibdir}/modules.d/90kernel-modules-extra
 %{dracutlibdir}/modules.d/90kernel-modules
@@ -408,6 +414,7 @@ fi
 %{dracutlibdir}/modules.d/90mdraid
 %{dracutlibdir}/modules.d/90multipath
 %{dracutlibdir}/modules.d/90nvdimm
+%{dracutlibdir}/modules.d/90overlayfs
 %{dracutlibdir}/modules.d/90qemu
 %{dracutlibdir}/modules.d/90qemu-net
 %{dracutlibdir}/modules.d/91crypt-gpg
