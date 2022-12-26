@@ -396,6 +396,9 @@ fi
 %endif
 %{dracutlibdir}/modules.d/80lvmmerge
 %{dracutlibdir}/modules.d/80lvmthinpool-monitor
+%exclude %{dracutlibdir}/modules.d/80test
+%exclude %{dracutlibdir}/modules.d/80test-makeroot
+%exclude %{dracutlibdir}/modules.d/80test-root
 %ifarch s390 s390x
 %{dracutlibdir}/modules.d/81cio_ignore
 %endif
