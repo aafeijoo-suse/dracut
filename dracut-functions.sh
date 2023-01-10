@@ -352,21 +352,27 @@ shorten_persistent_dev() {
     esac
 }
 
-# find_block_device <mountpoint>
+# find_block_device [--use-fstab] <mountpoint>
 # Prints the major and minor number of the block device
 # for a given mountpoint.
-# Unless $use_fstab is set to "yes" the functions
-# uses /proc/self/mountinfo as the primary source of the
+# Unless $use_fstab is set to "yes" or the --use-fstab option is passed,
+# the function uses /proc/self/mountinfo as the primary source of the
 # information and only falls back to /etc/fstab, if the mountpoint
 # is not found there.
 # Example:
 # $ find_block_device /usr
 # 8:4
 find_block_device() {
-    local _dev _majmin _find_mpt
+    local _dev _majmin _find_mpt _use_fstab
+
+    if [[ "$1" == "--use-fstab" ]]; then
+        _use_fstab=1
+        shift
+    fi
+
     _find_mpt="$1"
 
-    if [[ $use_fstab != yes ]]; then
+    if [[ $use_fstab != yes && -z "$_use_fstab" ]]; then
         [[ -d $_find_mpt/. ]]
         findmnt -e -v -n -o 'MAJ:MIN,SOURCE' --target "$_find_mpt" | {
             while read -r _majmin _dev || [ -n "$_dev" ]; do
@@ -418,18 +424,25 @@ find_block_device() {
     return 1
 }
 
-# find_mp_fstype <mountpoint>
+# find_mp_fstype [--use-fstab] <mountpoint>
 # Echo the filesystem type for a given mountpoint.
 # /proc/self/mountinfo is taken as the primary source of information
 # and /etc/fstab is used as a fallback.
+# If `use_fstab == yes` or the --use-fstab option is passed, then only
+# `/etc/fstab` is used.
 # No newline is appended!
 # Example:
 # $ find_mp_fstype /;echo
 # ext4
 find_mp_fstype() {
-    local _fs
+    local _fs _use_fstab
 
-    if [[ $use_fstab != yes ]]; then
+    if [[ "$1" == "--use-fstab" ]]; then
+        _use_fstab=1
+        shift
+    fi
+
+    if [[ $use_fstab != yes && -z "$_use_fstab" ]]; then
         findmnt -e -v -n -o 'FSTYPE' --target "$1" | {
             while read -r _fs || [ -n "$_fs" ]; do
                 [[ $_fs ]] || continue
@@ -456,22 +469,30 @@ find_mp_fstype() {
     return 1
 }
 
-# find_dev_fstype <device>
+# find_dev_fstype [--use-fstab] <device>
 # Echo the filesystem type for a given device.
 # /proc/self/mountinfo is taken as the primary source of information
 # and /etc/fstab is used as a fallback.
+# If `use_fstab == yes` or the --use-fstab option is passed, then only
+# `/etc/fstab` is used.
 # No newline is appended!
 # Example:
 # $ find_dev_fstype /dev/sda2;echo
 # ext4
 find_dev_fstype() {
-    local _find_dev _fs
+    local _find_dev _fs _use_fstab
+
+    if [[ "$1" == "--use-fstab" ]]; then
+        _use_fstab=1
+        shift
+    fi
+
     _find_dev="$1"
     if ! [[ $_find_dev == /dev* ]]; then
         [[ -b "/dev/block/$_find_dev" ]] && _find_dev="/dev/block/$_find_dev"
     fi
 
-    if [[ $use_fstab != yes ]]; then
+    if [[ $use_fstab != yes && -z "$_use_fstab" ]]; then
         findmnt -e -v -n -o 'FSTYPE' --source "$_find_dev" | {
             while read -r _fs || [ -n "$_fs" ]; do
                 [[ $_fs ]] || continue
@@ -498,16 +519,25 @@ find_dev_fstype() {
     return 1
 }
 
-# find_mp_fsopts <mountpoint>
+# find_mp_fsopts [--use-fstab] <mountpoint>
 # Echo the filesystem options for a given mountpoint.
 # /proc/self/mountinfo is taken as the primary source of information
 # and /etc/fstab is used as a fallback.
+# If `use_fstab == yes` or the --use-fstab option is passed, then only
+# `/etc/fstab` is used.
 # No newline is appended!
 # Example:
 # $ find_mp_fsopts /;echo
 # rw,relatime,discard,data=ordered
 find_mp_fsopts() {
-    if [[ $use_fstab != yes ]]; then
+    local _use_fstab
+
+    if [[ "$1" == "--use-fstab" ]]; then
+        _use_fstab=1
+        shift
+    fi
+
+    if [[ $use_fstab != yes && -z "$_use_fstab" ]]; then
         findmnt -e -v -n -o 'OPTIONS' --target "$1" 2> /dev/null && return 0
     fi
 
@@ -516,23 +546,30 @@ find_mp_fsopts() {
     findmnt --fstab -e -v -n -o 'OPTIONS' --target "$1"
 }
 
-# find_dev_fsopts <device>
+# find_dev_fsopts [--use-fstab] <device>
 # Echo the filesystem options for a given device.
 # /proc/self/mountinfo is taken as the primary source of information
 # and /etc/fstab is used as a fallback.
-# if `use_fstab == yes`, then only `/etc/fstab` is used.
+# If `use_fstab == yes` or the --use-fstab option is passed, then only
+# `/etc/fstab` is used.
 #
 # Example:
 # $ find_dev_fsopts /dev/sda2
 # rw,relatime,discard,data=ordered
 find_dev_fsopts() {
-    local _find_dev
+    local _find_dev _use_fstab
+
+    if [[ "$1" == "--use-fstab" ]]; then
+        _use_fstab=1
+        shift
+    fi
+
     _find_dev="$1"
     if ! [[ $_find_dev == /dev* ]]; then
         [[ -b "/dev/block/$_find_dev" ]] && _find_dev="/dev/block/$_find_dev"
     fi
 
-    if [[ $use_fstab != yes ]]; then
+    if [[ $use_fstab != yes && -z "$_use_fstab" ]]; then
         findmnt -e -v -n -o 'OPTIONS' --source "$_find_dev" 2> /dev/null && return 0
     fi
 
