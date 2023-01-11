@@ -1531,6 +1531,7 @@ if [[ $hostonly ]]; then
 fi
 
 declare -A host_fs_types
+declare -A host_dev_opts
 
 for line in "${fstab_lines[@]}"; do
     # shellcheck disable=SC2086
@@ -1565,12 +1566,14 @@ for line in "${fstab_lines[@]}"; do
     fi
     push_host_devs "$dev"
     host_fs_types["$dev"]="$3"
+    host_dev_opts["$dev"]="$4"
 done
 
 for f in $add_fstab; do
     [[ -e $f ]] || continue
-    while read -r dev rest || [ -n "$dev" ]; do
+    while read -r dev _ _ fsopts || [ -n "$dev" ]; do
         push_host_devs "$dev"
+        host_dev_opts["$dev"]="$fsopts"
     done < "$f"
 done
 
@@ -1669,13 +1672,16 @@ if [[ $hostonly ]] && [[ $hostonly_default_device != "no" ]]; then
             [[ -b $_dev ]] || continue
 
             push_host_devs "$_dev"
+            host_dev_opts["$_dev"]="$_o"
             if [[ $_t == btrfs ]]; then
                 for i in $(btrfs_devs "$_m"); do
                     push_host_devs "$i"
+                    host_dev_opts["$i"]="$(find_dev_fsopts --use-fstab "$i")"
                 done
             elif [[ $_t == zfs ]]; then
                 for i in $(zfs_devs "$_d"); do
                     push_host_devs "$i"
+                    host_dev_opts["$i"]="$(find_dev_fsopts --use-fstab "$i")"
                 done
             fi
         done < "$dracutsysrootdir"/etc/fstab
@@ -1930,7 +1936,7 @@ export initdir dracutbasedir \
     omit_drivers mdadmconf lvmconf root_devs \
     use_fstab fstab_lines libdirs fscks nofscks ro_mnt \
     stdloglvl sysloglvl fileloglvl kmsgloglvl logfile \
-    debug host_fs_types host_devs swap_devs sshkey add_fstab \
+    debug host_fs_types host_devs host_dev_opts swap_devs sshkey add_fstab \
     DRACUT_VERSION udevdir udevconfdir udevrulesdir udevrulesconfdir \
     prefix filesystems drivers dbus dbusconfdir dbusinterfaces \
     dbusinterfacesconfdir dbusservices dbusservicesconfdir dbussession \

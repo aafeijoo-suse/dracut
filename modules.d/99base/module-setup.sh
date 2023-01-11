@@ -134,9 +134,20 @@ install() {
                     done
 
                     _pdev=$(get_persistent_dev "$_dev")
-
+                    _dev_opts="${host_dev_opts["$_dev"]}"
+                    _dev_nofail=
+                    if [[ $_dev_opts == *nofail* ]]; then
+                        _dev_nofail="--nofail"
+                    fi
+                    _dev_timeout=0
+                    if [[ $_dev_opts == *x-systemd.device-timeout* ]]; then
+                        _dev_timeout="${_dev_opts##*x-systemd.device-timeout=}"
+                        _dev_timeout="${_dev_timeout%%,*}"
+                    fi
                     case "$_pdev" in
-                        /dev/?*) wait_for_dev "$_pdev" 0 ;;
+                        /dev/?*)
+                            wait_for_dev $_dev_nofail "$_pdev" "$_dev_timeout"
+                            ;;
                         *) ;;
                     esac
                 done

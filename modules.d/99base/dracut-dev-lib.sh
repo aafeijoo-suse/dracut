@@ -95,7 +95,7 @@ set_systemd_timeout_for_dev() {
     fi
 }
 
-# wait_for_dev <dev> [<timeout>]
+# wait_for_dev [-n] [--nofail] <dev> [<timeout>]
 #
 # Installs a initqueue-finished script,
 # which will cause the main loop only to exit,
@@ -103,9 +103,15 @@ set_systemd_timeout_for_dev() {
 wait_for_dev() {
     local _name
     local _noreload
+    local _nofail
 
     if [ "$1" = "-n" ]; then
         _noreload=-n
+        shift
+    fi
+
+    if [ "$1" = "--nofail" ]; then
+        _nofail=1
         shift
     fi
 
@@ -121,6 +127,13 @@ wait_for_dev() {
         printf '[ -e "%s" ] || ' "$1"
         printf 'warn "\"%s\" does not exist"\n' "$1"
     } >> "${PREFIX}$hookdir/emergency/80-${_name}.sh"
+
+    if [ -n "$_nofail" ]; then
+        {
+            printf -- 'warn "Cancelling the wait for %s. Device not found.";' "$1"
+            printf -- ' cancel_wait_for_dev %s;\n' "$1"
+        } >> "${PREFIX}$hookdir/initqueue/timeout/devexists-${_name}.sh"
+    fi
 
     set_systemd_timeout_for_dev $_noreload "$@"
 }
