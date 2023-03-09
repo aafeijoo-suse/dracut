@@ -183,7 +183,7 @@ nbft_parse_hfi() {
             "$(nbft_run_jq -r .primary_dns_ipaddr "$hfi_json")")
         dns2=$(nbft_check_empty_address \
             "$(nbft_run_jq -r .secondary_dns_ipaddr "$hfi_json")")
-        hostname=$(nbft_run_jq -r .host_name "$hfi_json") || hostname=
+        hostname=$(nbft_run_jq -r .host_name "$hfi_json" 2> /dev/null) || hostname=
 
         echo "ip=$ipaddr::$gateway:$prefix:$hostname:$iface${vlan:+.$vlan}:none${dns1:+:$dns1}${dns2:+:$dns2}"
     fi
