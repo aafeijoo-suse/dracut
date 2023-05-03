@@ -311,9 +311,9 @@ done
 
 if [ -e /tmp/nvmf_needs_network ] || [ -e /tmp/valid_nbft_entry_found ]; then
     echo "rd.neednet=1" > /etc/cmdline.d/nvmf-neednet.conf
+    netroot=nbft
     rm -f /tmp/nvmf_needs_network
 fi
 
-/sbin/initqueue --online --name nvmf-connect-online /sbin/nvmf-autoconnect.sh online
 /sbin/initqueue --settled --onetime --name nvmf-connect-settled /sbin/nvmf-autoconnect.sh settled
 /sbin/initqueue --timeout --onetime --name nvmf-connect-timeout /sbin/nvmf-autoconnect.sh timeout
