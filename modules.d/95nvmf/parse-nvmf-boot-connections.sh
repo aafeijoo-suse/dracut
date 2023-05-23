@@ -292,6 +292,22 @@ parse_nvmf_discover() {
     return 0
 }
 
+nvmf_timeout_udev_rule() {
+    local timeout
+
+    timeout=$(getarg rd.timeout)
+    case $timeout in
+        0 | "")
+            timeout=-1
+            ;;
+    esac
+    mkdir -p /etc/udev/rules.d
+    printf -- 'ACTION=="add|change", SUBSYSTEM=="nvme", KERNEL=="nvme*", ATTR{ctrl_loss_tmo}="%d"\n' "$timeout" \
+        > /etc/udev/rules.d/90-nvmf-timeout.rules
+}
+
+nvmf_timeout_udev_rule
+
 nvmf_hostnqn=$(getarg rd.nvmf.hostnqn -d nvmf.hostnqn=)
 if [ -n "$nvmf_hostnqn" ]; then
     echo "$nvmf_hostnqn" > /etc/nvme/hostnqn
