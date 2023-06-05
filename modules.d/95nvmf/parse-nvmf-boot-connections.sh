@@ -183,7 +183,7 @@ nbft_parse_hfi() {
             "$(nbft_run_jq -r .primary_dns_ipaddr "$hfi_json")")
         dns2=$(nbft_check_empty_address \
             "$(nbft_run_jq -r .secondary_dns_ipaddr "$hfi_json")")
-        hostname=$(nbft_run_jq -r .host_name "$hfi_json") || hostname=
+        hostname=$(nbft_run_jq -r .host_name "$hfi_json" 2> /dev/null) || hostname=
 
         echo "ip=$ipaddr::$gateway:$prefix:$hostname:$iface${vlan:+.$vlan}:none${dns1:+:$dns1}${dns2:+:$dns2}"
     fi
@@ -292,6 +292,22 @@ parse_nvmf_discover() {
     return 0
 }
 
+nvmf_timeout_udev_rule() {
+    local timeout
+
+    timeout=$(getarg rd.timeout)
+    case $timeout in
+        0 | "")
+            timeout=-1
+            ;;
+    esac
+    mkdir -p /etc/udev/rules.d
+    printf -- 'ACTION=="add|change", SUBSYSTEM=="nvme", KERNEL=="nvme*", ATTR{ctrl_loss_tmo}="%d"\n' "$timeout" \
+        > /etc/udev/rules.d/90-nvmf-timeout.rules
+}
+
+nvmf_timeout_udev_rule
+
 nvmf_hostnqn=$(getarg rd.nvmf.hostnqn -d nvmf.hostnqn=)
 if [ -n "$nvmf_hostnqn" ]; then
     echo "$nvmf_hostnqn" > /etc/nvme/hostnqn
@@ -311,9 +327,9 @@ done
 
 if [ -e /tmp/nvmf_needs_network ] || [ -e /tmp/valid_nbft_entry_found ]; then
     echo "rd.neednet=1" > /etc/cmdline.d/nvmf-neednet.conf
+    netroot=nbft
     rm -f /tmp/nvmf_needs_network
 fi
 
-/sbin/initqueue --online --name nvmf-connect-online /sbin/nvmf-autoconnect.sh online
 /sbin/initqueue --settled --onetime --name nvmf-connect-settled /sbin/nvmf-autoconnect.sh settled
 /sbin/initqueue --timeout --onetime --name nvmf-connect-timeout /sbin/nvmf-autoconnect.sh timeout
