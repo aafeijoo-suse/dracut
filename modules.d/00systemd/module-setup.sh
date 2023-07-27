@@ -14,7 +14,7 @@ check() {
 # Module dependency requirements.
 depends() {
     # This module has external dependency on other module(s).
-    echo systemd-ask-password systemd-journald systemd-sysctl
+    echo systemd-ask-password systemd-journald systemd-sysctl systemd-tmpfiles
     # Return 0 to include the dependent module(s) in the initramfs.
     return 0
 }
@@ -80,8 +80,6 @@ install() {
         "$systemdsystemunitdir"/sys-kernel-config.mount \
         "$systemdsystemunitdir"/modprobe@.service \
         "$systemdsystemunitdir"/kmod-static-nodes.service \
-        "$systemdsystemunitdir"/systemd-tmpfiles-setup.service \
-        "$systemdsystemunitdir"/systemd-tmpfiles-setup-dev.service \
         "$systemdsystemunitdir"/systemd-udevd-control.socket \
         "$systemdsystemunitdir"/systemd-udevd-kernel.socket \
         "$systemdsystemunitdir"/systemd-halt.service \
@@ -99,8 +97,6 @@ install() {
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-udevd.service \
         "$systemdsystemunitdir"/sysinit.target.wants/systemd-udev-trigger.service \
         "$systemdsystemunitdir"/sysinit.target.wants/kmod-static-nodes.service \
-        "$systemdsystemunitdir"/sysinit.target.wants/systemd-tmpfiles-setup.service \
-        "$systemdsystemunitdir"/sysinit.target.wants/systemd-tmpfiles-setup-dev.service \
         "$systemdsystemunitdir"/ctrl-alt-del.target \
         "$systemdsystemunitdir"/reboot.target \
         "$systemdsystemunitdir"/systemd-reboot.service \
@@ -108,13 +104,12 @@ install() {
         "$systemdsystemunitdir"/slices.target \
         "$systemdsystemunitdir"/system.slice \
         "$systemdsystemunitdir"/-.slice \
-        "$tmpfilesdir"/systemd.conf \
         systemctl \
         echo swapoff \
         kmod insmod rmmod modprobe modinfo depmod lsmod \
         mount umount reboot poweroff \
         systemd-run systemd-escape \
-        systemd-cgls systemd-tmpfiles \
+        systemd-cgls \
         /etc/udev/udev.hwdb
 
     if [[ $hostonly ]]; then
