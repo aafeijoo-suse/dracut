@@ -14,7 +14,7 @@ check() {
 # Module dependency requirements.
 depends() {
     # This module has external dependency on other module(s).
-    echo systemd-ask-password systemd-journald systemd-sysctl systemd-tmpfiles
+    echo systemd-ask-password systemd-journald systemd-sysctl systemd-tmpfiles systemd-udevd
     # Return 0 to include the dependent module(s) in the initramfs.
     return 0
 }
@@ -39,7 +39,6 @@ install() {
         "$systemdutildir"/systemd-shutdown \
         "$systemdutildir"/systemd-reply-password \
         "$systemdutildir"/systemd-fsck \
-        "$systemdutildir"/systemd-udevd \
         "$systemdutildir"/systemd-vconsole-setup \
         "$systemdutildir"/systemd-volatile-root \
         "$systemdutildir"/systemd-sysroot-fstab-check \
@@ -80,22 +79,13 @@ install() {
         "$systemdsystemunitdir"/sys-kernel-config.mount \
         "$systemdsystemunitdir"/modprobe@.service \
         "$systemdsystemunitdir"/kmod-static-nodes.service \
-        "$systemdsystemunitdir"/systemd-udevd-control.socket \
-        "$systemdsystemunitdir"/systemd-udevd-kernel.socket \
         "$systemdsystemunitdir"/systemd-halt.service \
         "$systemdsystemunitdir"/systemd-poweroff.service \
         "$systemdsystemunitdir"/systemd-reboot.service \
         "$systemdsystemunitdir"/systemd-kexec.service \
         "$systemdsystemunitdir"/systemd-fsck@.service \
-        "$systemdsystemunitdir"/systemd-udevd.service \
-        "$systemdsystemunitdir"/systemd-udev-trigger.service \
-        "$systemdsystemunitdir"/systemd-udev-settle.service \
         "$systemdsystemunitdir"/systemd-vconsole-setup.service \
         "$systemdsystemunitdir"/systemd-volatile-root.service \
-        "$systemdsystemunitdir"/sockets.target.wants/systemd-udevd-control.socket \
-        "$systemdsystemunitdir"/sockets.target.wants/systemd-udevd-kernel.socket \
-        "$systemdsystemunitdir"/sysinit.target.wants/systemd-udevd.service \
-        "$systemdsystemunitdir"/sysinit.target.wants/systemd-udev-trigger.service \
         "$systemdsystemunitdir"/sysinit.target.wants/kmod-static-nodes.service \
         "$systemdsystemunitdir"/ctrl-alt-del.target \
         "$systemdsystemunitdir"/reboot.target \
@@ -109,8 +99,7 @@ install() {
         kmod insmod rmmod modprobe modinfo depmod lsmod \
         mount umount reboot poweroff \
         systemd-run systemd-escape \
-        systemd-cgls \
-        /etc/udev/udev.hwdb
+        systemd-cgls
 
     if [[ $hostonly ]]; then
         inst_multiple -H -o \
@@ -124,8 +113,7 @@ install() {
             /etc/machine-id \
             /etc/machine-info \
             /etc/vconsole.conf \
-            /etc/locale.conf \
-            /etc/udev/udev.conf
+            /etc/locale.conf
     fi
 
     if ! [[ -e "$initdir/etc/machine-id" ]]; then
