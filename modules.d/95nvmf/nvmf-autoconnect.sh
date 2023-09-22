@@ -20,7 +20,8 @@ if [ -e /tmp/valid_nbft_entry_found ]; then
     /usr/sbin/nvme connect-nbft
     [ "$1" = timeout ] || exit 0
 fi
-if [ -f /etc/nvme/discovery.conf ] && [ $NVMF_HOSTNQN_OK ]; then
+if [ -f /etc/nvme/discovery.conf ] || [ -f /etc/nvme/config.json ] \
+    && [ $NVMF_HOSTNQN_OK ]; then
     # prio 3: discovery.conf from initrd
     /usr/sbin/nvme connect-all
     [ "$1" = timeout ] || exit 0
