@@ -26,14 +26,6 @@ get_suse_initrd_lines() {
     [[ -z "$conf_files" ]] || grep -h "^# SUSE INITRD: " $conf_files
 }
 
-read_initrd_modules() {
-    if [[ -f /etc/sysconfig/kernel ]]; then
-        INITRD_MODULES=
-        . /etc/sysconfig/kernel
-        echo "$INITRD_MODULES"
-    fi
-}
-
 filter_builtin() {
     while [[ $# -gt 0 ]]; do
         grep -q "/$1.ko" "/lib/modules/$kernel/modules.builtin" || echo "$1"
@@ -43,7 +35,7 @@ filter_builtin() {
 
 # called by dracut
 installkernel() {
-    local line mod reqs all_mods="$(filter_builtin $(read_initrd_modules))"
+    local line mod reqs all_mods
 
     while read -r line; do
         mod="${line##*SUSE INITRD: }"
