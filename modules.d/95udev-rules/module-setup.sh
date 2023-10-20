@@ -40,7 +40,6 @@ install() {
         61-persistent-storage-edd.rules \
         64-btrfs.rules \
         70-uaccess.rules \
-        70-persistent-net.rules \
         71-seat.rules \
         73-seat-late.rules \
         75-net-description.rules \
@@ -55,8 +54,16 @@ install() {
     inst_rules 91-permissions.rules
     # eudev rules
     inst_rules 80-drivers-modprobe.rules
-    # legacy persistent network device name rules
-    [[ $hostonly ]] && inst_rules 70-persistent-net.rules
+
+    # only include persistent network device name rules if network is set up
+    # in the initrd
+    # Avoid interference with systemd predictable network device naming
+    if dracut_module_included "network-legacy" || dracut_module_included "network-manager"; then
+        if [ -e /etc/udev/rules.d/70-persistent-net.rules ] && \
+           ! dracut_module_included "systemd-networkd"; then
+               [[ $hostonly ]] && inst_rules 70-persistent-net.rules
+        fi
+    fi
 
     {
         for i in cdrom tape dialout floppy; do

@@ -26,10 +26,12 @@ installkernel() {
 install() {
     local _arch
 
-    #Adding default link
-    if dracut_module_included "systemd"; then
+    # Add default link if there is no persistent network device naming
+    if [ ! -e /etc/udev/rules.d/70-persistent-net.rules ] &&\
+         dracut_module_included "systemd"; then
+
         inst_multiple -o "${systemdutildir}/network/99-default.link"
-        [[ $hostonly ]] && inst_multiple -H -o "${systemdsystemconfdir}/network/*.link"
+        [[ $hostonly ]] && inst_multiple -H -o "${systemdutilconfdir}/network/*.link"
     fi
 
     inst_multiple ip sed awk grep pgrep tr expr
