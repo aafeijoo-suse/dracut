@@ -51,9 +51,12 @@ install() {
         inst_simple "$moddir"/nm-initrd.service "$systemdsystemunitdir"/nm-initrd.service
         inst_simple "$moddir"/nm-wait-online-initrd.service "$systemdsystemunitdir"/nm-wait-online-initrd.service
 
-        # Adding default link
-        inst_multiple -o "${systemdutildir}/network/99-default.link"
-        [[ $hostonly ]] && inst_multiple -H -o "${systemdsystemconfdir}/network/*.link"
+        # Add default link if there is no persistent network device naming
+        if [ ! -e /etc/udev/rules.d/70-persistent-net.rules ]; then
+
+            inst_multiple -o "${systemdutildir}/network/99-default.link"
+            [[ $hostonly ]] && inst_multiple -H -o "${systemdutilconfdir}/network/*.link"
+        fi
 
         $SYSTEMCTL -q --root "$initdir" enable nm-initrd.service
     fi
