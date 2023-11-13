@@ -39,7 +39,6 @@ install() {
         60-persistent-storage.rules \
         61-persistent-storage-edd.rules \
         70-uaccess.rules \
-        70-persistent-net.rules \
         71-seat.rules \
         73-seat-late.rules \
         75-net-description.rules \
@@ -57,9 +56,19 @@ install() {
     # eudev rules
     inst_rules 80-drivers-modprobe.rules
 
-    if dracut_module_included "systemd"; then
-        inst_multiple -o ${systemdutildir}/network/*.link
-        [[ $hostonly ]] && inst_multiple -H -o /etc/systemd/network/*.link
+    # legacy persistent network device names versus systemd predictable names
+    # Never use both schemes at the same time!
+    if dracut_module_included "network"; then
+        if [ -z "$systemdnetwork" ]; then
+            systemdnetwork="${systemdutildir}/network"
+        fi
+        if [ -e /etc/udev/rules.d/70-persistent-net.rules ] && \
+           ! dracut_module_included "systemd-networkd"; then
+            inst_rules 70-persistent-net.rules
+        elif [ -e "$systemdnetwork"/99-default.link ]; then
+            inst_multiple -o "$systemdnetwork"/*.link
+            [[ $hostonly ]] && inst_multiple -H -o /etc/systemd/network/*.link
+        fi
     fi
 
     {
