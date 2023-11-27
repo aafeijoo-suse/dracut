@@ -1704,7 +1704,8 @@ static int modalias_list(struct kmod_ctx *ctx)
                         struct kmod_module *mod = kmod_module_get_module(l);
                         char *name = strdup(kmod_module_get_name(mod));
                         kmod_module_unref(mod);
-                        hashmap_put(modules_loaded, name, name);
+                        if (hashmap_put(modules_loaded, name, name) < 0)
+                                free(name);
                 }
         }
 
@@ -1719,8 +1720,11 @@ static int modalias_list(struct kmod_ctx *ctx)
 
                         struct kmod_module *mod = kmod_module_get_module(itr);
                         char *name = strdup(kmod_module_get_name(mod));
-                        hashmap_put(modules_loaded, name, name);
                         kmod_module_unref(mod);
+                        if (hashmap_put(modules_loaded, name, name) < 0) {
+                                free(name);
+                                continue;
+                        }
 
                         /* also put the modules from the new kernel in the hashmap,
                          * which resolve the name as an alias, in case a kernel module is
@@ -1734,8 +1738,9 @@ static int modalias_list(struct kmod_ctx *ctx)
                         kmod_list_foreach(l, modlist) {
                                 mod = kmod_module_get_module(l);
                                 char *name = strdup(kmod_module_get_name(mod));
-                                hashmap_put(modules_loaded, name, name);
                                 kmod_module_unref(mod);
+                                if (hashmap_put(modules_loaded, name, name) < 0)
+                                        free(name);
                         }
                 }
                 kmod_module_unref_list(loaded_list);
@@ -2027,7 +2032,8 @@ int main(int argc, char **argv)
                 HASHMAP_FOREACH(name, modules_loaded, i) {
                         printf("%s\n", name);
                 }
-                exit(0);
+                r = EXIT_SUCCESS;
+                goto finish2;
         }
 
         log_debug("Program arguments:");
