@@ -1,7 +1,7 @@
 #
 # spec file for package dracut
 #
-# Copyright (c) 2022 SUSE LLC
+# Copyright (c) 2024 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -70,14 +70,14 @@ Conflicts:      suse-module-tools < 15.4.7
 %{?systemd_requires}
 
 %description
-Dracut contains tools to create a bootable initramfs for Linux kernels >= 2.6.
-Dracut contains various modules which are driven by the event-based udev
+dracut contains tools to create a bootable initramfs for Linux kernels >= 2.6.
+dracut contains various modules which are driven by the event-based udev
 and systemd. Having root on MD, DM, LVM2, LUKS is supported as well as
 NFS, iSCSI, NBD, FCoE.
 
 %ifnarch %ix86
 %package fips
-Summary:        Dracut modules to build a dracut initramfs with an integrity check
+Summary:        dracut modules to build a dracut initramfs with an integrity check
 Group:          System/Base
 Requires:       %{name} = %{version}-%{release}
 Requires:       libcryptsetup12-hmac
@@ -92,7 +92,7 @@ and its cryptography during startup.
 
 %ifnarch %ix86
 %package ima
-Summary:        Dracut modules to build a dracut initramfs with IMA
+Summary:        dracut modules to build a dracut initramfs with IMA
 Group:          System/Base
 Requires:       %{name} = %{version}-%{release}
 Requires:       evmctl
@@ -114,13 +114,29 @@ Provides:       %{name}:%{_bindir}/dracut-catimages
 This package contains tools to assemble the local initrd and host configuration.
 
 %package extra
-Summary:        Dracut modules usually not required for normal operation
+Summary:        dracut modules usually not required for normal operation
 Group:          System/Base
 Requires:       %{name} = %{version}-%{release}
 
 %description extra
 This package contains all modules that are part of dracut upstream
 but are not normally supported or required.
+
+%package network
+Summary:        dracut modules to build a dracut initramfs with network support
+Group:          System/Base
+Requires:       %{name} = %{version}-%{release}
+# network-legacy  => iputils or arping2 or wicked
+# network-manager => NetworkManager
+# connman         => connman
+Requires:       (iputils or arping2 or wicked or NetworkManager or connman)
+# NetworkManager >= 1.20 has an internal DHCP client
+Requires:       (dhcp-client if NetworkManager < 1.20)
+Requires:       (jq if nvme-cli)
+
+%description network
+This package requires everything which is needed to build an initramfs with
+dracut with network support.
 
 %prep
 %autosetup
@@ -222,6 +238,9 @@ fi
 %{?regenerate_initrd_post}
 %endif
 
+%post network
+%{?regenerate_initrd_post}
+
 %postun
 %{?regenerate_initrd_post}
 
@@ -235,6 +254,9 @@ fi
 %{?regenerate_initrd_post}
 %endif
 
+%postun network
+%{?regenerate_initrd_post}
+
 %posttrans
 %{?regenerate_initrd_posttrans}
 
@@ -247,6 +269,9 @@ fi
 %posttrans ima
 %{?regenerate_initrd_posttrans}
 %endif
+
+%posttrans network
+%{?regenerate_initrd_posttrans}
 
 %ifnarch %ix86
 %files fips
@@ -273,7 +298,6 @@ fi
 
 %files extra
 %license COPYING
-
 %{dracutlibdir}/modules.d/00mksh
 %{dracutlibdir}/modules.d/02caps
 %{dracutlibdir}/modules.d/00dash
@@ -287,6 +311,38 @@ fi
 %{dracutlibdir}/modules.d/95zfcp
 %{dracutlibdir}/modules.d/95znet
 %endif
+
+%files network
+%license COPYING
+%{dracutlibdir}/modules.d/00systemd-network-management
+%{dracutlibdir}/modules.d/01systemd-hostnamed
+%{dracutlibdir}/modules.d/01systemd-networkd
+%{dracutlibdir}/modules.d/01systemd-resolved
+%{dracutlibdir}/modules.d/01systemd-timedated
+%{dracutlibdir}/modules.d/01systemd-timesyncd
+%{dracutlibdir}/modules.d/35connman
+%{dracutlibdir}/modules.d/35network-legacy
+%{dracutlibdir}/modules.d/35network-manager
+%{dracutlibdir}/modules.d/40network
+%{dracutlibdir}/modules.d/45ifcfg
+%{dracutlibdir}/modules.d/45url-lib
+%ifarch s390 s390x
+%{dracutlibdir}/modules.d/80cms
+%endif
+%{dracutlibdir}/modules.d/90kernel-network-modules
+%{dracutlibdir}/modules.d/90livenet
+%{dracutlibdir}/modules.d/90qemu-net
+%{dracutlibdir}/modules.d/95cifs
+%{dracutlibdir}/modules.d/95fcoe
+%{dracutlibdir}/modules.d/95fcoe-uefi
+%{dracutlibdir}/modules.d/95iscsi
+%{dracutlibdir}/modules.d/95nbd
+%{dracutlibdir}/modules.d/95nfs
+%{dracutlibdir}/modules.d/95nvmf
+%ifarch s390 s390x
+%{dracutlibdir}/modules.d/95qeth_rules
+%endif
+%{dracutlibdir}/modules.d/95ssh-client
 
 %files
 %license COPYING
@@ -345,7 +401,6 @@ fi
 %dir %{dracutlibdir}/modules.d
 %{dracutlibdir}/modules.d/00bash
 %{dracutlibdir}/modules.d/00systemd
-%{dracutlibdir}/modules.d/00systemd-network-management
 %ifnarch s390 s390x
 %{dracutlibdir}/modules.d/00warpclock
 %endif
@@ -355,23 +410,18 @@ fi
 %{dracutlibdir}/modules.d/01systemd-ac-power
 %{dracutlibdir}/modules.d/01systemd-ask-password
 %{dracutlibdir}/modules.d/01systemd-coredump
-%{dracutlibdir}/modules.d/01systemd-hostnamed
 %{dracutlibdir}/modules.d/01systemd-initrd
 %{dracutlibdir}/modules.d/01systemd-integritysetup
 %{dracutlibdir}/modules.d/01systemd-journald
 %{dracutlibdir}/modules.d/01systemd-ldconfig
 %{dracutlibdir}/modules.d/01systemd-modules-load
-%{dracutlibdir}/modules.d/01systemd-networkd
 %{dracutlibdir}/modules.d/01systemd-pcrphase
 %{dracutlibdir}/modules.d/01systemd-portabled
 %{dracutlibdir}/modules.d/01systemd-pstore
 %{dracutlibdir}/modules.d/01systemd-repart
-%{dracutlibdir}/modules.d/01systemd-resolved
 %{dracutlibdir}/modules.d/01systemd-sysctl
 %{dracutlibdir}/modules.d/01systemd-sysext
 %{dracutlibdir}/modules.d/01systemd-sysusers
-%{dracutlibdir}/modules.d/01systemd-timedated
-%{dracutlibdir}/modules.d/01systemd-timesyncd
 %{dracutlibdir}/modules.d/01systemd-tmpfiles
 %{dracutlibdir}/modules.d/01systemd-udevd
 %{dracutlibdir}/modules.d/01systemd-veritysetup
@@ -385,18 +435,9 @@ fi
 %{dracutlibdir}/modules.d/09dbus
 %{dracutlibdir}/modules.d/10i18n
 %{dracutlibdir}/modules.d/30convertfs
-%{dracutlibdir}/modules.d/35connman
-%{dracutlibdir}/modules.d/35network-legacy
-%{dracutlibdir}/modules.d/35network-manager
-%{dracutlibdir}/modules.d/40network
-%{dracutlibdir}/modules.d/45ifcfg
-%{dracutlibdir}/modules.d/45url-lib
 %{dracutlibdir}/modules.d/50drm
 %{dracutlibdir}/modules.d/50plymouth
 %{dracutlibdir}/modules.d/62bluetooth
-%ifarch s390 s390x
-%{dracutlibdir}/modules.d/80cms
-%endif
 %{dracutlibdir}/modules.d/80lvmmerge
 %{dracutlibdir}/modules.d/80lvmthinpool-monitor
 %exclude %{dracutlibdir}/modules.d/80test
@@ -414,15 +455,12 @@ fi
 %{dracutlibdir}/modules.d/90dmsquash-live-ntfs
 %{dracutlibdir}/modules.d/90kernel-modules-extra
 %{dracutlibdir}/modules.d/90kernel-modules
-%{dracutlibdir}/modules.d/90kernel-network-modules
-%{dracutlibdir}/modules.d/90livenet
 %{dracutlibdir}/modules.d/90lvm
 %{dracutlibdir}/modules.d/90mdraid
 %{dracutlibdir}/modules.d/90multipath
 %{dracutlibdir}/modules.d/90nvdimm
 %{dracutlibdir}/modules.d/90overlayfs
 %{dracutlibdir}/modules.d/90qemu
-%{dracutlibdir}/modules.d/90qemu-net
 %{dracutlibdir}/modules.d/91crypt-gpg
 %{dracutlibdir}/modules.d/91crypt-loop
 %{dracutlibdir}/modules.d/91fido2
@@ -431,28 +469,15 @@ fi
 %{dracutlibdir}/modules.d/91tpm2-tss
 %ifarch s390 s390x
 %{dracutlibdir}/modules.d/91zipl
-%endif
-%{dracutlibdir}/modules.d/95cifs
-%ifarch s390 s390x
 %{dracutlibdir}/modules.d/95dasd_mod
 %{dracutlibdir}/modules.d/95dasd_rules
 %{dracutlibdir}/modules.d/95dcssblk
 %endif
 %{dracutlibdir}/modules.d/95debug
-%{dracutlibdir}/modules.d/95fcoe
-%{dracutlibdir}/modules.d/95fcoe-uefi
 %{dracutlibdir}/modules.d/95fstab-sys
-%{dracutlibdir}/modules.d/95iscsi
 %{dracutlibdir}/modules.d/95lunmask
-%{dracutlibdir}/modules.d/95nbd
-%{dracutlibdir}/modules.d/95nfs
-%{dracutlibdir}/modules.d/95nvmf
-%ifarch s390 s390x
-%{dracutlibdir}/modules.d/95qeth_rules
-%endif
 %{dracutlibdir}/modules.d/95resume
 %{dracutlibdir}/modules.d/95rootfs-block
-%{dracutlibdir}/modules.d/95ssh-client
 %{dracutlibdir}/modules.d/95terminfo
 %{dracutlibdir}/modules.d/95udev-rules
 %{dracutlibdir}/modules.d/95virtfs
@@ -460,9 +485,11 @@ fi
 %ifarch s390 s390x
 %{dracutlibdir}/modules.d/95zfcp_rules
 %endif
-%{dracutlibdir}/modules.d/97biosdevname
 %ifarch %ix86
 %exclude %{dracutlibdir}/modules.d/96securityfs
+%endif
+%{dracutlibdir}/modules.d/97biosdevname
+%ifarch %ix86
 %exclude %{dracutlibdir}/modules.d/97masterkey
 %exclude %{dracutlibdir}/modules.d/98integrity
 %endif
