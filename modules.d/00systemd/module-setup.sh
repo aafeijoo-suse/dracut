@@ -264,6 +264,8 @@ EOF
     # Install library file(s)
     _arch=${DRACUT_ARCH:-$(uname -m)}
     inst_libdir_file \
+        {"tls/$_arch/",tls/,"$_arch/",}"libgcrypt.so*" \
+        {"tls/$_arch/",tls/,"$_arch/",}"libkmod.so*" \
         {"tls/$_arch/",tls/,"$_arch/",}"libnss_*" \
         {"tls/$_arch/",tls/,"$_arch/",}"systemd/libsystemd*.so"
 
