@@ -203,7 +203,7 @@ if [ -L /var/run ] && [ -f /etc/dracut.conf.d/05-convertfs.conf ]; then
 fi
 
 # remove obsolete legacy fillup template for /etc/sysconfig/kernel
-[ -f /var/adm/fillup-templates/sysconfig.kernel-mkinitrd ] && rm -f /var/adm/fillup-templates/sysconfig.kernel-mkinitrd
+rm -f /var/adm/fillup-templates/sysconfig.kernel-mkinitrd
 
 %{?regenerate_initrd_post}
 
