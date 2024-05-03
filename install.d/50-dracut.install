@@ -13,7 +13,7 @@ if ! [[ ${KERNEL_INSTALL_MACHINE_ID-x} ]]; then
 fi
 
 # Do not attempt to create initramfs if the supplied image is already a UKI
-if [[ "$KERNEL_INSTALL_IMAGE_TYPE" = "uki" ]]; then
+if [[ $KERNEL_INSTALL_IMAGE_TYPE == "uki" ]]; then
     exit 0
 fi
 
