@@ -60,4 +60,6 @@ installkernel() {
     if [[ "$all_mods" ]]; then
         hostonly= dracut_instmods $all_mods
     fi
+
+    return 0
 }
