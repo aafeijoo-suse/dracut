@@ -6,11 +6,12 @@ Maintaining dracut
 Patches are added as merge requests on GitHub against the respective maintenance
 branch. Currently, these active maintenance branches are:
 
-- SUSE/044          -> SLE 12 SP5
-- SUSE/049          -> SLE 15 SP2, SLE 15 SP3
-- SUSE/055          -> SLE 15 SP4
-- SLE-15-SP5_Update -> SLE 15 SP5 (based on SUSE/055 plus some specific patches)
-- SUSE/059          -> Tumbleweed
+- SUSE/044              -> SLE 12 SP5
+- SUSE/049              -> SLE 15 SP2, SLE 15 SP3
+- SUSE/055              -> SLE 15 SP4
+- SLE-15-SP5_Update     -> SLE 15 SP5 (based on SUSE/055 plus some specific patches)
+- SL-Micro-6.0_Update   -> SL Micro 6.0
+- SUSE/059              -> Tumbleweed
 
 Rules:
 
