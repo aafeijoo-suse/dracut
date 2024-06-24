@@ -91,7 +91,7 @@ the upgrade to dracut-059 (0aa08f0e docs: update NEWS.md and AUTHORS), extracted
 using `git log --oneline 0aa08f0e..HEAD`:
 
         4980bad3 fix(configure): misleading error if C compiler is not installed
-        de8ac630 fix(github): update format of labeler
+MERGED  de8ac630 fix(github): update format of labeler
 MERGED  4971f443 fix(systemd-journald): add systemd-sysusers dependency
 MERGED  4d594210 fix(dracut-initramfs-restore.sh): do not set selinux labels if disabled
 MERGED  1586af09 fix(systemd-repart): correct undefined $libdir
@@ -336,4 +336,24 @@ PR      Commit message
 2618    fix(i18n): handle keymap includes with `--sysroot`
 2618    fix(dracut-init.sh): handle decompress with `--sysroot`
 2630    fix(zfcp_rules): correct shellcheck regression when parsing ccw args
+
+3. Commits from the new https://github.com/dracut-ng/dracut-ng upstream that
+were already merged
+
+6c55657e refactor(cms): use zdev to simplify handling CMSDASD=... boot option
+53a5d10b refactor(cms): use consolidated zfcp config with zdev from s390-tools
+168c0c66 refactor(cms): use consolidated dasd config with zdev from s390-tools
+0b6d6952 refactor(cms): use consolidated network config with zdev from s390-tools
+166e8a22 refactor(cms): remove now unnecessary inclusion of full s390utils-base
+b5a35f9d feat(zfcp_rules): remove zfcp handling consolidated in s390-tools
+7745a81a feat(zfcp): minimize zfcp handling consolidated in s390-tools
+72c945ca feat(dasd_rules): remove dasd handling consolidated in s390-tools
+2397c479 feat(dasd_mod): minimize dasd handling consolidated in s390-tools
+36e1f884 feat(dasd): minimize dasd handling consolidated in s390-tools
+658a21ac feat(znet): use zdev for consolidated device configuration
+8707a69b docs(dracut.cmdline): generalize description of rd.znet
+198a86c2 feat(qeth_rules): remove qeth handling consolidated in 95znet
+22f51730 fix(znet): append to udev rules so each rd.znet_ifname is effective
+2d8fa8be refactor(ifcfg): delete code duplication using iface_get_subchannels()
+457e66e6 feat(ifcfg): minimize s390-specific network configuration aspects
 
