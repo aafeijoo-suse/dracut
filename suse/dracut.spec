@@ -146,11 +146,8 @@ rm -rf %{buildroot}%{dracutlibdir}/modules.d/81cio_ignore
 rm -rf %{buildroot}%{dracutlibdir}/modules.d/91zipl
 rm -rf %{buildroot}%{dracutlibdir}/modules.d/95dasd
 rm -rf %{buildroot}%{dracutlibdir}/modules.d/95dasd_mod
-rm -rf %{buildroot}%{dracutlibdir}/modules.d/95dasd_rules
 rm -rf %{buildroot}%{dracutlibdir}/modules.d/95dcssblk
-rm -rf %{buildroot}%{dracutlibdir}/modules.d/95qeth_rules
 rm -rf %{buildroot}%{dracutlibdir}/modules.d/95zfcp
-rm -rf %{buildroot}%{dracutlibdir}/modules.d/95zfcp_rules
 rm -rf %{buildroot}%{dracutlibdir}/modules.d/95znet
 %else
 rm -rf %{buildroot}%{dracutlibdir}/modules.d/00warpclock
@@ -433,7 +430,6 @@ fi
 %{dracutlibdir}/modules.d/95cifs
 %ifarch s390 s390x
 %{dracutlibdir}/modules.d/95dasd_mod
-%{dracutlibdir}/modules.d/95dasd_rules
 %{dracutlibdir}/modules.d/95dcssblk
 %endif
 %{dracutlibdir}/modules.d/95debug
@@ -445,9 +441,6 @@ fi
 %{dracutlibdir}/modules.d/95nbd
 %{dracutlibdir}/modules.d/95nfs
 %{dracutlibdir}/modules.d/95nvmf
-%ifarch s390 s390x
-%{dracutlibdir}/modules.d/95qeth_rules
-%endif
 %{dracutlibdir}/modules.d/95resume
 %{dracutlibdir}/modules.d/95rootfs-block
 %{dracutlibdir}/modules.d/95ssh-client
@@ -455,9 +448,6 @@ fi
 %{dracutlibdir}/modules.d/95udev-rules
 %{dracutlibdir}/modules.d/95virtfs
 %{dracutlibdir}/modules.d/95virtiofs
-%ifarch s390 s390x
-%{dracutlibdir}/modules.d/95zfcp_rules
-%endif
 %{dracutlibdir}/modules.d/97biosdevname
 %ifarch %ix86
 %exclude %{dracutlibdir}/modules.d/96securityfs
