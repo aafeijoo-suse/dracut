@@ -337,3 +337,8 @@ PR      Commit message
 2618    fix(dracut-init.sh): handle decompress with `--sysroot`
 2630    fix(zfcp_rules): correct shellcheck regression when parsing ccw args
 
+3. Commits from the new https://github.com/dracut-ng/dracut-ng upstream that
+were already merged
+
+3fd43858 fix(mdraid): try to assemble the missing raid device
+
