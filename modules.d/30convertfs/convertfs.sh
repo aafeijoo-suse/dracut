@@ -20,7 +20,7 @@ while [[ $ROOT != "${ROOT%/}" ]]; do
 done
 
 #mount /sysroot rw
-[ -w $ROOT ] || mount -o remount,rw $ROOT
+[[ -w $ROOT ]] || mount -o remount,rw "$ROOT"
 
 #mount /sysroot/var if it is a separate mount
 VARDEV=$(sed -n -e 's/^\#.*//' -e '/ \/var /s/\([[:graph:]]* \).*/\1/p' "$ROOT"/etc/fstab)
@@ -28,12 +28,12 @@ VARFS=$(sed -n -e 's/^\#.*//' -e '/ \/var /s/[[:graph:]]* * [[:graph:]]* *\([[:g
 
 if [[ -n $VARDEV ]] && [[ -n $VARFS ]]; then
     #mount btrfs subvolume var
-    if [ $VARFS == btrfs ]; then
-        SUBVOLIDVAR=$(btrfs subvolume list $ROOT | sed -n '/var$/s/ID \([[:digit:]]*\) .*/\1/p')
+    if [[ $VARFS == btrfs ]]; then
+        SUBVOLIDVAR=$(btrfs subvolume list "$ROOT" | sed -n '/var$/s/ID \([[:digit:]]*\) .*/\1/p')
         ROOTDEV=$(sed -n "/\\$ROOT/s/\([[:graph:]]*\) .*/\1/p" /proc/mounts)
-        [ -z $SUBVOLIDVAR ] || mount -o subvolid=$SUBVOLIDVAR $ROOTDEV $ROOT/var
+        [[  -z $SUBVOLIDVAR ]] || mount -o subvolid="$SUBVOLIDVAR" "$ROOTDEV" "$ROOT"/var
     else
-        mount $VARDEV $ROOT/var
+        mount "$VARDEV" "$ROOT"/var
     fi
 fi
 
@@ -50,8 +50,8 @@ if [ ! -L "$ROOT"/var/lock -a -e "$ROOT"/var/lock ]; then
     ln -sfn ../run/lock "$ROOT"/var/lock
 fi
 
-[[ -n $SUBVOLIDVAR ]] && umount $ROOT/var
-[ -w $ROOT ] && mount -o remount,ro $ROOT
+[[ -n $SUBVOLIDVAR ]] && umount "$ROOT"/var
+[[ -w $ROOT ]] && mount -o remount,ro "$ROOT"
 
 echo "Done."
 exit 0
