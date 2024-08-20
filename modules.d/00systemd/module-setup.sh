@@ -48,6 +48,8 @@ install() {
         "$systemdutildir"/system-generators/systemd-debug-generator \
         "$systemdutildir"/system-generators/systemd-fstab-generator \
         "$systemdutildir"/system-generators/systemd-gpt-auto-generator \
+        "$systemdutildir"/system.conf \
+        "$systemdutildir"/system.conf.d/*.conf \
         "$systemdsystemunitdir"/debug-shell.service \
         "$systemdsystemunitdir"/cryptsetup.target \
         "$systemdsystemunitdir"/cryptsetup-pre.target \
@@ -167,8 +169,8 @@ install() {
         inst_multiple -H -o \
             /etc/systemd/journald.conf \
             /etc/systemd/journald.conf.d/*.conf \
-            /etc/systemd/system.conf \
-            /etc/systemd/system.conf.d/*.conf \
+            "$systemdutilconfdir"/system.conf \
+            "$systemdutilconfdir"/system.conf.d/*.conf \
             "$systemdsystemconfdir"/modprobe@.service \
             "$systemdsystemconfdir/modprobe@.service.d/*.conf" \
             /etc/hosts \
