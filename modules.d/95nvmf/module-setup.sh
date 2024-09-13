@@ -2,9 +2,10 @@
 
 # called by dracut
 check() {
+    local -A nvmf_trtypes
+
     require_binaries nvme jq || return 1
-    [ -f /etc/nvme/hostnqn ] || return 255
-    [ -f /etc/nvme/hostid ] || return 255
+    require_kernel_modules nvme_fabrics || return 1
 
     is_nvmf() {
         local _dev=$1
@@ -22,7 +23,12 @@ check() {
                 break
             fi
         done
-        [[ $trtype == "fc" ]] || [[ $trtype == "tcp" ]] || [[ $trtype == "rdma" ]]
+        if [[ $trtype == "fc" ]] || [[ $trtype == "tcp" ]] || [[ $trtype == "rdma" ]]; then
+            nvmf_trtypes["nvme_${trtype}"]=1
+            return 0
+        else
+            return 1
+        fi
     }
 
     has_nbft() {
@@ -36,11 +42,14 @@ check() {
     }
 
     [[ $hostonly ]] || [[ $mount_needs ]] && {
+        [ -f /etc/nvme/hostnqn ] || return 255
+        [ -f /etc/nvme/hostid ] || return 255
         pushd . > /dev/null
         for_each_host_dev_and_slaves is_nvmf
         local _is_nvmf=$?
         popd > /dev/null || exit
         [[ $_is_nvmf == 0 ]] || return 255
+        require_kernel_modules "${!nvmf_trtypes[@]}" || return 1
         if [ ! -f /sys/class/fc/fc_udev_device/nvme_discovery ] \
             && [ ! -f /etc/nvme/discovery.conf ] \
             && [ ! -f /etc/nvme/config.json ] && ! has_nbft; then
@@ -59,8 +68,9 @@ depends() {
 
 # called by dracut
 installkernel() {
-    instmods nvme_fc lpfc qla2xxx
-    hostonly="" instmods nvme_tcp nvme_fabrics 8021q
+    instmods nvme_fc nvme_tcp nvme_rdma lpfc qla2xxx
+    # 802.1q VLAN may be set up in Firmware later. Include the module always.
+    hostonly="" instmods 8021q
 }
 
 # called by dracut
@@ -130,8 +140,8 @@ install() {
         _nvmf_args=$(cmdline)
         [[ "$_nvmf_args" ]] && printf "%s" "$_nvmf_args" >> "${initdir}/etc/cmdline.d/95nvmf-args.conf"
     fi
-    inst_simple "/etc/nvme/hostnqn"
-    inst_simple "/etc/nvme/hostid"
+    inst_simple -H "/etc/nvme/hostnqn"
+    inst_simple -H "/etc/nvme/hostid"
 
     inst_multiple ip sed
 
