@@ -29,7 +29,8 @@ depends() {
 # Install the required file(s) and directories for the module in the initramfs.
 install() {
 
-    inst_dir /var/lib/systemd/coredump
+    inst_simple "$moddir/initrd.conf" "$systemdutildir/coredump.conf.d/initrd.conf"
+
     inst_multiple -o \
         "$sysctld"/50-coredump.conf \
         "$systemdutildir"/coredump.conf \
