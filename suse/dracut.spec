@@ -41,6 +41,12 @@ BuildRequires:  pkgconfig(libkmod)
 BuildRequires:  pkgconfig(systemd) >= 219
 BuildRequires:  cargo
 BuildRequires:  rust
+# For regenerate_initrd_posttrans
+%if 0%{?suse_version} < 1550
+BuildRequires:  suse-module-tools
+%else
+BuildRequires:  rpm-config-SUSE
+%endif
 Requires:       gawk
 Requires:       %{_bindir}/get_kernel_version
 Requires:       bash
