@@ -309,6 +309,16 @@ push_host_devs() {
     done
 }
 
+# Fills up user_devs stack variable and makes sure there are no duplicates
+push_user_devs() {
+    local _dev
+    for _dev in "$@"; do
+        [[ -z $_dev ]] && continue
+        [[ " ${user_devs[*]} " == *" $_dev "* ]] && return
+        user_devs+=("$_dev")
+    done
+}
+
 # Little helper function for reading args from the commandline.
 # it automatically handles -a b and -a=b variants, and returns 1 if
 # we need to shift $3.
@@ -1611,7 +1621,7 @@ for line in "${fstab_lines[@]}"; do
             push_host_devs "$mp"
         done
     fi
-    push_host_devs "$dev"
+    push_user_devs "$dev"
     host_fs_types["$dev"]="$3"
 done
 
@@ -1623,12 +1633,12 @@ for f in $add_fstab; do
 done
 
 for dev in $add_device; do
-    push_host_devs "$dev"
+    push_user_devs "$dev"
 done
 
 if ((${#add_device_l[@]})); then
     add_device+=" ${add_device_l[*]} "
-    push_host_devs "${add_device_l[@]}"
+    push_user_devs "${add_device_l[@]}"
 fi
 
 if [[ $hostonly ]] && [[ $hostonly_default_device != "no" ]]; then
@@ -1750,7 +1760,7 @@ _get_fs_type() {
     return 1
 }
 
-for dev in "${host_devs[@]}"; do
+for dev in "${host_devs[@]}" "${user_devs[@]}"; do
     _get_fs_type "$dev"
     check_block_and_slaves_all _get_fs_type "$(get_maj_min "$dev")"
 done
@@ -1778,7 +1788,7 @@ export initdir dracutbasedir \
     omit_drivers mdadmconf lvmconf root_devs \
     use_fstab fstab_lines libdirs fscks nofscks ro_mnt \
     stdloglvl sysloglvl fileloglvl kmsgloglvl logfile \
-    host_fs_types host_devs swap_devs sshkey add_fstab \
+    host_fs_types host_devs user_devs swap_devs sshkey add_fstab \
     DRACUT_VERSION \
     prefix filesystems drivers \
     hostonly_cmdline loginstall check_supported
