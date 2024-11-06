@@ -139,7 +139,7 @@ install() {
                     _pdev=$(get_persistent_dev "$_dev")
 
                     case "$_pdev" in
-                        /dev/?*) wait_for_dev "$_pdev" 0 ;;
+                        /dev/?*) wait_for_dev "$_pdev" "infinity" ;;
                         *) ;;
                     esac
                 done

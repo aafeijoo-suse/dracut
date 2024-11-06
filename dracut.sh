@@ -1966,10 +1966,12 @@ if [[ $no_kernel != yes ]]; then
     if [[ $force_drivers ]]; then
         # shellcheck disable=SC2086
         hostonly='' instmods -c $force_drivers
-        rm -f "$initdir"/etc/cmdline.d/20-force_driver.conf
-        for mod in $force_drivers; do
-            echo "rd.driver.pre=$mod" >> "$initdir"/etc/cmdline.d/20-force_drivers.conf
-        done
+        if [[ $kernel_only != yes ]]; then
+            rm -f "$initdir"/etc/cmdline.d/20-force_driver.conf
+            for mod in $force_drivers; do
+                echo "rd.driver.pre=$mod" >> "$initdir"/etc/cmdline.d/20-force_drivers.conf
+            done
+        fi
     fi
     if [[ $filesystems ]]; then
         # shellcheck disable=SC2086
@@ -2040,7 +2042,7 @@ if [[ $kernel_only != yes ]]; then
     if [[ $DRACUT_RESOLVE_LAZY ]] && [[ $DRACUT_INSTALL ]]; then
         dinfo "*** Resolving executable dependencies ***"
         # shellcheck disable=SC2086
-        find "$initdir" -type f -perm /0111 -not -path '*.ko' -print0 \
+        find "$initdir" -type f -perm /0111 -not -path '*.ko*' -print0 \
             | xargs -r -0 $DRACUT_INSTALL ${initdir:+-D "$initdir"} ${dracutsysrootdir:+-r "$dracutsysrootdir"} -R ${DRACUT_FIPS_MODE:+-f} --
         # shellcheck disable=SC2181
         if (($? == 0)); then
@@ -2115,6 +2117,7 @@ if [[ $do_strip == yes ]]; then
         fi
     done
 
+    kstrip_args=(-g)
     if [[ $aggressive_strip == yes ]]; then
         # `eu-strip` and `strip` both strips all unneeded parts by default
         strip_args=(-p)
@@ -2258,7 +2261,7 @@ if [[ $do_strip == yes ]] && ! [[ $DRACUT_FIPS_MODE ]]; then
     [[ -n $enhanced_cpio ]] && ddebug "strip is enabled alongside cpio reflink"
     dinfo "*** Stripping files ***"
     find "$initdir" -type f \
-        -executable -not -path '*/lib/modules/*.ko' -print0 \
+        -executable -not -path '*/lib/modules/*.ko*' -print0 \
         | xargs -r -0 $strip_cmd "${strip_args[@]}" 2> /dev/null
 
     # strip kernel modules, but do not touch signed modules
@@ -2266,7 +2269,7 @@ if [[ $do_strip == yes ]] && ! [[ $DRACUT_FIPS_MODE ]]; then
         | while read -r -d $'\0' f || [ -n "$f" ]; do
             SIG=$(tail -c 28 "$f" | tr -d '\000')
             [[ $SIG == '~Module signature appended~' ]] || { printf "%s\000" "$f"; }
-        done | xargs -r -0 $strip_cmd "${strip_args[@]}"
+        done | xargs -r -0 $strip_cmd "${kstrip_args[@]}"
     dinfo "*** Stripping files done ***"
 fi
 

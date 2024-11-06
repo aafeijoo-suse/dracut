@@ -33,7 +33,8 @@ if getargbool 1 rd.shell -d -y rdshell || getarg rd.break -d rdbreak; then
         ) > /dev/"$_tty"
     done < /proc/consoles
     [ -f /etc/profile ] && . /etc/profile
-    [ -z "$PS1" ] && export PS1="$_name:\${PWD}# "
+    [ -z "$PS1" ] && PS1="$_rdshell_name:\${PWD}# "
+    export PS1
     exec sulogin -e
 else
     export hook="shutdown-emergency"
