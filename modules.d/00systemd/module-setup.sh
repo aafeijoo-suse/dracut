@@ -131,6 +131,7 @@ install() {
         "$systemdsystemunitdir"/system.slice \
         "$systemdsystemunitdir"/-.slice \
         "$tmpfilesdir"/systemd.conf \
+        "$tmpfilesdir"/20-systemd-stub.conf \
         journalctl systemctl \
         echo swapoff \
         kmod insmod rmmod modprobe modinfo depmod lsmod \
