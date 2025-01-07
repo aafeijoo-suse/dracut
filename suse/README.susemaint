@@ -343,3 +343,4 @@ were already merged
 3fd43858 fix(mdraid): try to assemble the missing raid device
 61ab3386 feat(crypt): force the inclusion of crypttab entries with x-initrd.attach
 d2ade8a6 fix(dm): remove 59-persistent-storage-dm.rules
+c79fc8fd fix(dracut): rework timeout for devices added via --mount and --add-device
