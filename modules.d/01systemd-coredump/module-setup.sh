@@ -29,7 +29,8 @@ depends() {
 # Install the required file(s) and directories for the module in the initramfs.
 install() {
 
-    inst_dir /var/lib/systemd/coredump
+    inst_simple "$moddir/initrd.conf" "$systemdutildir/coredump.conf.d/initrd.conf"
+
     inst_multiple -o \
         "$sysctld"/50-coredump.conf \
         "$systemdutildir"/coredump.conf \
@@ -40,6 +41,13 @@ install() {
         "$systemdsystemunitdir"/sockets.target.wants/systemd-coredump.socket \
         "$sysusers"/systemd-coredump.conf \
         coredumpctl
+
+    # Install library file(s)
+    _arch=${DRACUT_ARCH:-$(uname -m)}
+    inst_libdir_file \
+        {"tls/$_arch/",tls/,"$_arch/",}"liblz4.so.*" \
+        {"tls/$_arch/",tls/,"$_arch/",}"liblzma.so.*" \
+        {"tls/$_arch/",tls/,"$_arch/",}"libzstd.so.*"
 
     # Install the hosts local user configurations if enabled.
     if [[ $hostonly ]]; then

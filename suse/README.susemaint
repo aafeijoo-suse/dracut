@@ -92,6 +92,7 @@ The following list shows the commits merged (those marked with "MERGED") since
 the upgrade to dracut-059 (0aa08f0e docs: update NEWS.md and AUTHORS), extracted
 using `git log --oneline 0aa08f0e..HEAD`:
 
+MERGED  5d2bda46 fix(zfcp_rules): correct shellcheck regression when parsing ccw args
         4980bad3 fix(configure): misleading error if C compiler is not installed
 MERGED  de8ac630 fix(github): update format of labeler
 MERGED  4971f443 fix(systemd-journald): add systemd-sysusers dependency
@@ -298,13 +299,13 @@ MERGED  88fe9205 fix: shellcheck 0.8.0
 MERGED  93339444 fix(dmsquash-live): live:/dev/*
 MERGED  10cf8e46 fix(load_fstype): avoid false positive searchs
 MERGED  08b63a25 fix: shellcheck 0.8.0
-        94dcac7c refactor(dracut-install): strerror(errno) -> %m
-        efd4ca27 perf(dracut-install): don't strdup() environment block
-        77226cb4 perf(dracut-install): don't reallocate {src,dst}path in hmac_install()
-        a20556f0 perf(dracut-install): don't strdup() excessively for dracut_install()
-        e7ed8337 perf(dracut-install): stat() w/unused buf -> access(F_OK) in dracut-install
-        751a110f perf(dracut-install): multiple single-character strstr()s -> strpbrk()
-        1e5237dd chore: remove src/install/hashmap.lo
+MERGED  94dcac7c refactor(dracut-install): strerror(errno) -> %m
+MERGED  efd4ca27 perf(dracut-install): don't strdup() environment block
+MERGED  77226cb4 perf(dracut-install): don't reallocate {src,dst}path in hmac_install()
+MERGED  a20556f0 perf(dracut-install): don't strdup() excessively for dracut_install()
+MERGED  e7ed8337 perf(dracut-install): stat() w/unused buf -> access(F_OK) in dracut-install
+MERGED  751a110f perf(dracut-install): multiple single-character strstr()s -> strpbrk()
+MERGED  1e5237dd chore: remove src/install/hashmap.lo
 MERGED  9dbbebb1 feat(network-wicked): remove module
 
 
@@ -314,8 +315,10 @@ PR      Commit message
 ----    --------------
 2342    fix(systemd-sysext): handle confexts and correct extensions search path
 2404    fix(multipath): explicitly check if hostonly_cmdline is yes
+2448    feat(dracut): add option to disable automatic guessing of output file
 2451    fix(base): correct handling of quiet in loginit
 2524    fix(dracut.sh): abort if Bash is in POSIX mode
+2526    fix(systemd-pcrphase): rename systemd-pcrphase binary to systemd-pcrextend
 2527    fix(resume): add new systemd-hibernate-resume.service
 2531    feat(kernel-modules): add Qualcomm IPC router to enable USB
 2532    fix(dracut-systemd): use `DRACUT_VERSION` instead of `VERSION`
@@ -326,10 +329,16 @@ PR      Commit message
 2557    feat(kernel-modules): install SPMI modules on ARM/RISC-V
 2559    feat(install.d): add sort-key field to rescue BLS entries
 2560    feat(resume): do not attempt to install systemd-hibernate-resume@.service
+2571    fix(dracut-install): memory leak in `--modalias` option
+2573    fix(dracut-install): release memory allocated for regular expressions
+2574    fix(dracut-install): memory leak in two `hashmap_put` calls if key exists
+2577    perf(drm): group dracut_instmods calls
 2593    fix(dracut.sh): do not add device if find_block_device returns an error
 2593    feat(dracut.sh): protect push_host_devs function
+2601    feat(tpm2-tss): add tpm2.target and systemd-tpm2-generator
 2607    fix(dracut-util): do not call strcmp if the value argument is NULL
 2607    fix(dracut): correct regression with multiple `rd.break=` options
+2608    fix(dracut-util): avoid memory leak
 2611    fix(livenet): propagate error code
 2611    fix(livenet): check also `content-length` from live image header
 2611    fix(livenet): split `imgsize` calculation to avoid misleading error message
@@ -337,11 +346,16 @@ PR      Commit message
 2614    fix(dracut-systemd): replace `rd.udev.log-priority` with `rd.udev.log_level`
 2618    fix(i18n): handle keymap includes with `--sysroot`
 2618    fix(dracut-init.sh): handle decompress with `--sysroot`
-2630    fix(zfcp_rules): correct shellcheck regression when parsing ccw args
+2623    fix(dracut-lib): only remove initqueue/finished scripts, not the hook dir
+2643    fix(systemd): explicitly install some libs that will not be statically included
+
 
 3. Commits from the new https://github.com/dracut-ng/dracut-ng upstream that
 were already merged
 
+a45048b8 fix(dracut): move hooks directory from /usr/lib to /var/lib
+424717af fix: /etc/modprobe.d --> /run/modprobe.d (partially reverted)
+4cc962aa fix(systemd-ask-password): no graphical output in aarch64
 6c55657e refactor(cms): use zdev to simplify handling CMSDASD=... boot option
 53a5d10b refactor(cms): use consolidated zfcp config with zdev from s390-tools
 168c0c66 refactor(cms): use consolidated dasd config with zdev from s390-tools
@@ -369,3 +383,9 @@ d0c82322 fix(dracut): do not add all lib subdirs to `LD_LIBRARY_PATH` with `--sy
 41332702 fix(nvmf): require NVMeoF modules
 3748ed4d fix(nvmf): install (only) required nvmf modules
 d2ade8a6 fix(dm): remove 59-persistent-storage-dm.rules
+3e1d0bc1 fix(dracut-install): copy xattr when use clone ioctl
+a1c51af1 fix(dracut): don't apply aggressive strip to kernel modules
+ad36b61e fix(dracut.sh): omit compressed kernel modules from find searching exec files
+bfa00c2a fix(pcsc): add libpcsclite_real.so.*
+0df92885 fix(systemd-tmpfiles): copy 20-systemd-stub.conf into the initrd
+c79fc8fd fix(dracut): rework timeout for devices added via --mount and --add-device

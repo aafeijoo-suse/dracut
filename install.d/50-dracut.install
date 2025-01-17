@@ -13,7 +13,14 @@ if ! [[ ${KERNEL_INSTALL_MACHINE_ID-x} ]]; then
 fi
 
 # Do not attempt to create initramfs if the supplied image is already a UKI
-if [[ "$KERNEL_INSTALL_IMAGE_TYPE" = "uki" ]]; then
+if [[ $KERNEL_INSTALL_IMAGE_TYPE == "uki" ]]; then
+    exit 0
+fi
+
+# Skip this plugin if we're using a different generator. If nothing is specified,
+# assume we're wanted since we're installed.
+if [[ ${KERNEL_INSTALL_INITRD_GENERATOR:-dracut} != "dracut" ]] \
+    && [[ ${KERNEL_INSTALL_UKI_GENERATOR:-dracut} != "dracut" ]]; then
     exit 0
 fi
 
@@ -39,7 +46,7 @@ elif [[ $KERNEL_INSTALL_LAYOUT == "bls" && -n $KERNEL_INSTALL_STAGING_AREA ]]; t
     else
         exit 0
     fi
-else
+elif [[ ${KERNEL_INSTALL_INITRD_GENERATOR:-dracut} == "dracut" ]]; then
     # No layout information, use users --uefi/--no-uefi preference
     UEFI_OPTS=""
     if [[ -d $BOOT_DIR_ABS ]]; then
@@ -48,6 +55,8 @@ else
         BOOT_DIR_ABS="/boot"
         IMAGE="initrd-${KERNEL_VERSION}"
     fi
+else
+    exit 0
 fi
 
 ret=0

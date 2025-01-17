@@ -45,7 +45,10 @@ install() {
 
     [ -e "${initdir}/lib" ] || mkdir -m 0755 -p "${initdir}"/lib
     mkdir -m 0755 -p "${initdir}"/lib/dracut
-    mkdir -m 0755 -p "${initdir}"/lib/dracut/hooks
+    mkdir -m 0755 -p "${initdir}"/var/lib/dracut/hooks
+
+    # symlink to old hooks location for compatibility
+    ln_r /var/lib/dracut/hooks /lib/dracut/hooks
 
     mkdir -p "${initdir}"/tmp
 
@@ -107,7 +110,7 @@ install() {
 
     ## save host_devs which we need bring up
     if [[ $hostonly_cmdline == "yes" ]]; then
-        if [[ -n ${host_devs[*]} ]]; then
+        if [[ -n ${host_devs[*]} ]] || [[ -n ${user_devs[*]} ]]; then
             dracut_need_initqueue
         fi
         if [[ -f $initdir/lib/dracut/need-initqueue ]] || ! dracut_module_included "systemd"; then
@@ -134,6 +137,22 @@ install() {
                     done
 
                     _pdev=$(get_persistent_dev "$_dev")
+
+                    case "$_pdev" in
+                        /dev/?*) wait_for_dev "$_pdev" "infinity" ;;
+                        *) ;;
+                    esac
+                done
+
+                for _dev in "${user_devs[@]}"; do
+
+                    case "$_dev" in
+                        /dev/?*) wait_for_dev "$_dev" 0 ;;
+                        *) ;;
+                    esac
+
+                    _pdev=$(get_persistent_dev "$_dev")
+                    [[ $_dev == "$_pdev" ]] && continue
 
                     case "$_pdev" in
                         /dev/?*) wait_for_dev "$_pdev" 0 ;;

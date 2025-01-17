@@ -315,6 +315,16 @@ push_host_devs() {
     done
 }
 
+# Fills up user_devs stack variable and makes sure there are no duplicates
+push_user_devs() {
+    local _dev
+    for _dev in "$@"; do
+        [[ -z $_dev ]] && continue
+        [[ " ${user_devs[*]} " == *" $_dev "* ]] && return
+        user_devs+=("$_dev")
+    done
+}
+
 # Little helper function for reading args from the commandline.
 # it automatically handles -a b and -a=b variants, and returns 1 if
 # we need to shift $3.
@@ -946,6 +956,13 @@ for f in $(dropindirs_sort ".conf" "$confdir" "$dracutbasedir/dracut.conf.d"); d
     # shellcheck disable=SC1090
     [[ -e $f ]] && . "$f"
 done
+
+# check if automatic guessing of the output file is disabled.
+if [[ $force_output_file == "yes" && -z $outfile ]]; then
+    printf "%s\n" "dracut[F]: dracut is configured with force_output_file=yes" >&2
+    printf "%s\n" "dracut[F]: so it is required to specify the file path of the generated initramfs image." >&2
+    exit 1
+fi
 
 # regenerate_all shouldn't be set in conf files
 regenerate_all=$regenerate_all_l
@@ -1617,7 +1634,7 @@ for line in "${fstab_lines[@]}"; do
             push_host_devs "$mp"
         done
     fi
-    push_host_devs "$dev"
+    push_user_devs "$dev"
     host_fs_types["$dev"]="$3"
 done
 
@@ -1629,12 +1646,12 @@ for f in $add_fstab; do
 done
 
 for dev in $add_device; do
-    push_host_devs "$dev"
+    push_user_devs "$dev"
 done
 
 if ((${#add_device_l[@]})); then
     add_device+=" ${add_device_l[*]} "
-    push_host_devs "${add_device_l[@]}"
+    push_user_devs "${add_device_l[@]}"
 fi
 
 if [[ $hostonly ]] && [[ $hostonly_default_device != "no" ]]; then
@@ -1756,7 +1773,7 @@ _get_fs_type() {
     return 1
 }
 
-for dev in "${host_devs[@]}"; do
+for dev in "${host_devs[@]}" "${user_devs[@]}"; do
     _get_fs_type "$dev"
     check_block_and_slaves_all _get_fs_type "$(get_maj_min "$dev")"
 done
@@ -1784,7 +1801,7 @@ export initdir dracutbasedir \
     omit_drivers mdadmconf lvmconf root_devs \
     use_fstab fstab_lines libdirs fscks nofscks ro_mnt \
     stdloglvl sysloglvl fileloglvl kmsgloglvl logfile \
-    host_fs_types host_devs swap_devs sshkey add_fstab \
+    host_fs_types host_devs user_devs swap_devs sshkey add_fstab \
     DRACUT_VERSION \
     prefix filesystems drivers \
     hostonly_cmdline loginstall check_supported
@@ -1874,7 +1891,11 @@ mkdir -p "${initdir}"/lib/dracut
 
 if [[ $kernel_only != yes ]]; then
     mkdir -p "${initdir}/etc/cmdline.d"
-    mkdir -m 0755 "${initdir}"/lib/dracut/hooks
+    mkdir -m 0755 -p "${initdir}"/var/lib/dracut/hooks
+
+    # symlink to old hooks location for compatibility
+    ln_r /var/lib/dracut/hooks /lib/dracut/hooks
+
     # shellcheck disable=SC2154
     for _d in $hookdirs; do
         # shellcheck disable=SC2174
@@ -1955,10 +1976,12 @@ if [[ $no_kernel != yes ]]; then
     if [[ $force_drivers ]]; then
         # shellcheck disable=SC2086
         hostonly='' instmods -c $force_drivers
-        rm -f "$initdir"/etc/cmdline.d/20-force_driver.conf
-        for mod in $force_drivers; do
-            echo "rd.driver.pre=$mod" >> "$initdir"/etc/cmdline.d/20-force_drivers.conf
-        done
+        if [[ $kernel_only != yes ]]; then
+            rm -f "$initdir"/etc/cmdline.d/20-force_driver.conf
+            for mod in $force_drivers; do
+                echo "rd.driver.pre=$mod" >> "$initdir"/etc/cmdline.d/20-force_drivers.conf
+            done
+        fi
     fi
     if [[ $filesystems ]]; then
         # shellcheck disable=SC2086
@@ -2029,7 +2052,7 @@ if [[ $kernel_only != yes ]]; then
     if [[ $DRACUT_RESOLVE_LAZY ]] && [[ $DRACUT_INSTALL ]]; then
         dinfo "*** Resolving executable dependencies ***"
         # shellcheck disable=SC2086
-        find "$initdir" -type f -perm /0111 -not -path '*.ko' -print0 \
+        find "$initdir" -type f -perm /0111 -not -path '*.ko*' -print0 \
             | xargs -r -0 $DRACUT_INSTALL ${initdir:+-D "$initdir"} ${dracutsysrootdir:+-r "$dracutsysrootdir"} -R ${DRACUT_FIPS_MODE:+-f} --
         # shellcheck disable=SC2181
         if (($? == 0)); then
@@ -2104,6 +2127,7 @@ if [[ $do_strip == yes ]]; then
         fi
     done
 
+    kstrip_args=(-g)
     if [[ $aggressive_strip == yes ]]; then
         # `eu-strip` and `strip` both strips all unneeded parts by default
         strip_args=(-p)
@@ -2247,7 +2271,7 @@ if [[ $do_strip == yes ]] && ! [[ $DRACUT_FIPS_MODE ]]; then
     [[ -n $enhanced_cpio ]] && ddebug "strip is enabled alongside cpio reflink"
     dinfo "*** Stripping files ***"
     find "$initdir" -type f \
-        -executable -not -path '*/lib/modules/*.ko' -print0 \
+        -executable -not -path '*/lib/modules/*.ko*' -print0 \
         | xargs -r -0 $strip_cmd "${strip_args[@]}" 2> /dev/null
 
     # strip kernel modules, but do not touch signed modules
@@ -2255,7 +2279,7 @@ if [[ $do_strip == yes ]] && ! [[ $DRACUT_FIPS_MODE ]]; then
         | while read -r -d $'\0' f || [ -n "$f" ]; do
             SIG=$(tail -c 28 "$f" | tr -d '\000')
             [[ $SIG == '~Module signature appended~' ]] || { printf "%s\000" "$f"; }
-        done | xargs -r -0 $strip_cmd "${strip_args[@]}"
+        done | xargs -r -0 $strip_cmd "${kstrip_args[@]}"
     dinfo "*** Stripping files done ***"
 fi
 

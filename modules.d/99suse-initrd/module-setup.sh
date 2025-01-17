@@ -58,6 +58,8 @@ installkernel() {
     # strip whitespace
     all_mods="$(echo $all_mods)"
     if [[ "$all_mods" ]]; then
-        hostonly= dracut_instmods $all_mods
+        hostonly='' dracut_instmods $all_mods
     fi
+
+    return 0
 }

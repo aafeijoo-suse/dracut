@@ -42,6 +42,7 @@
 #include <fts.h>
 #include <regex.h>
 #include <sys/utsname.h>
+#include <sys/xattr.h>
 
 #include "log.h"
 #include "hashmap.h"
@@ -271,6 +272,56 @@ static inline int clone_file(int dest_fd, int src_fd)
         return ioctl(dest_fd, BTRFS_IOC_CLONE, src_fd);
 }
 
+static int copy_xattr(int dest_fd, int src_fd)
+{
+        int ret = 0;
+        ssize_t name_len = 0, value_len = 0;
+        char *name_buf = NULL, *name = NULL, *value = NULL, *value_save = NULL;
+
+        name_len = flistxattr(src_fd, NULL, 0);
+        if (name_len < 0)
+                return -1;
+
+        name_buf = calloc(1, name_len + 1);
+        if (name_buf == NULL)
+                return -1;
+
+        name_len = flistxattr(src_fd, name_buf, name_len);
+        if (name_len < 0)
+                goto out;
+
+        for (name = name_buf; name != name_buf + name_len; name = strchr(name, '\0') + 1) {
+                value_len = fgetxattr(src_fd, name, NULL, 0);
+                if (value_len < 0) {
+                        ret = -1;
+                        continue;
+                }
+
+                value_save = value;
+                value = realloc(value, value_len);
+                if (value == NULL) {
+                        value = value_save;
+                        ret = -1;
+                        goto out;
+                }
+
+                value_len = fgetxattr(src_fd, name, value, value_len);
+                if (value_len < 0) {
+                        ret = -1;
+                        continue;
+                }
+
+                value_len = fsetxattr(dest_fd, name, value, value_len, 0);
+                if (value_len < 0)
+                        ret = -1;
+        }
+
+out:
+        free(name_buf);
+        free(value);
+        return ret;
+}
+
 static bool use_clone = true;
 
 static int cp(const char *src, const char *dst)
@@ -311,6 +362,11 @@ static int cp(const char *src, const char *dst)
                                         else
                                                 log_info("Failed to chown %s: %m", dst);
                                 }
+
+                        if (geteuid() == 0 && no_xattr == false) {
+                                if (copy_xattr(dest_desc, source_desc) != 0)
+                                        log_error("Failed to copy xattr %s: %m", dst);
+                        }
 
                         tv[0].tv_sec = sb.st_atime;
                         tv[0].tv_usec = 0;
@@ -356,23 +412,23 @@ static int library_install(const char *src, const char *lib)
         char *q, *clibdir;
         int r, ret = 0;
 
-        p = strdup(lib);
-
-        r = dracut_install(p, p, false, false, true);
+        r = dracut_install(lib, lib, false, false, true);
         if (r != 0)
-                log_error("ERROR: failed to install '%s' for '%s'", p, src);
+                log_error("ERROR: failed to install '%s' for '%s'", lib, src);
         else
-                log_debug("Lib install: '%s'", p);
+                log_debug("Lib install: '%s'", lib);
         ret += r;
 
         /* also install lib.so for lib.so.* files */
-        q = strstr(p, ".so.");
+        q = strstr(lib, ".so.");
         if (q) {
-                q[3] = '\0';
+                p = strndup(lib, q - lib + 3);
 
                 /* ignore errors for base lib symlink */
                 if (dracut_install(p, p, false, false, true) == 0)
                         log_debug("Lib install: '%s'", p);
+
+                free(p);
         }
 
         /* Also try to install the same library from one directory above
@@ -384,7 +440,6 @@ static int library_install(const char *src, const char *lib)
            libc.so.6 (libc6,64bit, OS ABI: Linux 2.6.32) => /lib64/libc.so.6
          */
 
-        free(p);
         p = strdup(lib);
 
         pdir = dirname_malloc(p);
@@ -634,13 +689,8 @@ static int resolve_deps(const char *src)
 /* Install ".<filename>.hmac" file for FIPS self-checks */
 static int hmac_install(const char *src, const char *dst, const char *hmacpath)
 {
-        _cleanup_free_ char *srcpath = strdup(src);
-        _cleanup_free_ char *dstpath = strdup(dst);
         _cleanup_free_ char *srchmacname = NULL;
         _cleanup_free_ char *dsthmacname = NULL;
-
-        if (!(srcpath && dstpath))
-                return -ENOMEM;
 
         size_t dlen = dir_len(src);
 
@@ -654,16 +704,14 @@ static int hmac_install(const char *src, const char *dst, const char *hmacpath)
                 hmac_install(src, dst, "/lib64/hmaccalc");
         }
 
-        srcpath[dlen] = '\0';
-        dstpath[dir_len(dst)] = '\0';
         if (hmacpath) {
                 _asprintf(&srchmacname, "%s/%s.hmac", hmacpath, &src[dlen + 1]);
                 _asprintf(&dsthmacname, "%s/%s.hmac", hmacpath, &src[dlen + 1]);
         } else {
-                _asprintf(&srchmacname, "%s/.%s.hmac", srcpath, &src[dlen + 1]);
-                _asprintf(&dsthmacname, "%s/.%s.hmac", dstpath, &src[dlen + 1]);
+                _asprintf(&srchmacname, "%.*s/.%s.hmac", (int)dlen,         src, &src[dlen + 1]);
+                _asprintf(&dsthmacname, "%.*s/.%s.hmac", (int)dir_len(dst), dst, &src[dlen + 1]);
         }
-        log_debug("hmac cp '%s' '%s')", srchmacname, dsthmacname);
+        log_debug("hmac cp '%s' '%s'", srchmacname, dsthmacname);
         dracut_install(srchmacname, dsthmacname, false, false, true);
         return 0;
 }
@@ -727,11 +775,11 @@ static int dracut_mkdir(const char *src)
                                 return 1;
                         }
                 } else if (errno != ENOENT) {
-                        log_error("ERROR: stat '%s': %s", parent, strerror(errno));
+                        log_error("ERROR: stat '%s': %m", parent);
                         return 1;
                 } else {
                         if (mkdir(parent, 0755) < 0) {
-                                log_error("ERROR: mkdir '%s': %s", parent, strerror(errno));
+                                log_error("ERROR: mkdir '%s': %m", parent);
                                 return 1;
                         }
                 }
@@ -747,7 +795,7 @@ static int dracut_mkdir(const char *src)
 
 static int dracut_install(const char *orig_src, const char *orig_dst, bool isdir, bool resolvedeps, bool hashdst)
 {
-        struct stat sb, db;
+        struct stat sb;
         _cleanup_free_ char *fullsrcpath = NULL;
         _cleanup_free_ char *fulldstpath = NULL;
         _cleanup_free_ char *fulldstdir = NULL;
@@ -757,25 +805,24 @@ static int dracut_install(const char *orig_src, const char *orig_dst, bool isdir
         mode_t src_mode = 0;
         bool dst_exists = true;
         char *i = NULL;
-        _cleanup_free_ char *src;
-        _cleanup_free_ char *dst;
+        const char *src, *dst;
 
         if (sysrootdirlen) {
                 if (strncmp(orig_src, sysrootdir, sysrootdirlen) == 0) {
-                        src = strdup(orig_src + sysrootdirlen);
+                        src = orig_src + sysrootdirlen;
                         fullsrcpath = strdup(orig_src);
                 } else {
-                        src = strdup(orig_src);
+                        src = orig_src;
                         _asprintf(&fullsrcpath, "%s%s", sysrootdir, src);
                 }
                 if (strncmp(orig_dst, sysrootdir, sysrootdirlen) == 0)
-                        dst = strdup(orig_dst + sysrootdirlen);
+                        dst = orig_dst + sysrootdirlen;
                 else
-                        dst = strdup(orig_dst);
+                        dst = orig_dst;
         } else {
-                src = strdup(orig_src);
+                src = orig_src;
                 fullsrcpath = strdup(src);
-                dst = strdup(orig_dst);
+                dst = orig_dst;
         }
 
         log_debug("dracut_install('%s', '%s', %d, %d, %d)", src, dst, isdir, resolvedeps, hashdst);
@@ -831,7 +878,7 @@ static int dracut_install(const char *orig_src, const char *orig_dst, bool isdir
                         return 1;
                 }
 
-                ret = stat(fulldstdir, &db);
+                ret = access(fulldstdir, F_OK);
 
                 if (ret < 0) {
                         _cleanup_free_ char *dname = NULL;
@@ -891,12 +938,12 @@ static int dracut_install(const char *orig_src, const char *orig_dst, bool isdir
                                 return 1;
                         }
 
-                        if (lstat(abspath, &sb) != 0) {
+                        if (faccessat(AT_FDCWD, abspath, F_OK, AT_SYMLINK_NOFOLLOW) != 0) {
                                 log_debug("lstat '%s': %m", abspath);
                                 return 1;
                         }
 
-                        if (lstat(fulldstpath, &sb) != 0) {
+                        if (faccessat(AT_FDCWD, fulldstpath, F_OK, AT_SYMLINK_NOFOLLOW) != 0) {
                                 _cleanup_free_ char *absdestpath = NULL;
 
                                 _asprintf(&absdestpath, "%s/%s", destrootdir,
@@ -941,7 +988,8 @@ static int dracut_install(const char *orig_src, const char *orig_dst, bool isdir
                 if (!i)
                         return -ENOMEM;
 
-                hashmap_put(items, i, i);
+                if (hashmap_put(items, i, i) < 0)
+                        free(i);
 
                 if (logfile_f)
                         dracut_log_cp(src);
@@ -1093,10 +1141,10 @@ static int parse_argv(int argc, char *argv[])
                         arg_module = true;
                         break;
                 case 'D':
-                        destrootdir = strdup(optarg);
+                        destrootdir = optarg;
                         break;
                 case 'r':
-                        sysrootdir = strdup(optarg);
+                        sysrootdir = optarg;
                         sysrootdirlen = strlen(sysrootdir);
                         break;
                 case 'p':
@@ -1135,10 +1183,10 @@ static int parse_argv(int argc, char *argv[])
                         arg_mod_filter_noname = true;
                         break;
                 case 'L':
-                        logdir = strdup(optarg);
+                        logdir = optarg;
                         break;
                 case ARG_KERNELDIR:
-                        kerneldir = strdup(optarg);
+                        kerneldir = optarg;
                         break;
                 case ARG_FIRMWAREDIRS:
                         firmwaredirs = strv_split(optarg, ":");
@@ -1250,7 +1298,6 @@ static char **find_binary(const char *src)
         char *newsrc = NULL;
 
         STRV_FOREACH(q, pathdirs) {
-                struct stat sb;
                 char *fullsrcpath;
 
                 _asprintf(&newsrc, "%s/%s", *q, src);
@@ -1263,8 +1310,8 @@ static char **find_binary(const char *src)
                         continue;
                 }
 
-                if (lstat(fullsrcpath, &sb) != 0) {
-                        log_debug("stat(%s) != 0", fullsrcpath);
+                if (faccessat(AT_FDCWD, fullsrcpath, F_OK, AT_SYMLINK_NOFOLLOW) != 0) {
+                        log_debug("lstat(%s) != 0", fullsrcpath);
                         free(newsrc);
                         newsrc = NULL;
                         free(fullsrcpath);
@@ -1347,8 +1394,7 @@ static int install_all(int argc, char **argv)
 
                 } else {
                         if (strchr(argv[i], '*') == NULL) {
-                                _cleanup_free_ char *dest = strdup(argv[i]);
-                                ret = dracut_install(argv[i], dest, arg_createdir, arg_resolvedeps, true);
+                                ret = dracut_install(argv[i], argv[i], arg_createdir, arg_resolvedeps, true);
                         } else {
                                 _cleanup_free_ char *realsrc = NULL;
                                 _cleanup_globfree_ glob_t globbuf;
@@ -1360,11 +1406,9 @@ static int install_all(int argc, char **argv)
                                         size_t j;
 
                                         for (j = 0; j < globbuf.gl_pathc; j++) {
-                                                char *dest = strdup(globbuf.gl_pathv[j] + sysrootdirlen);
-                                                ret |=
-                                                        dracut_install(globbuf.gl_pathv[j] + sysrootdirlen, dest,
-                                                                       arg_createdir, arg_resolvedeps, true);
-                                                free(dest);
+                                                ret |= dracut_install(globbuf.gl_pathv[j] + sysrootdirlen,
+                                                                      globbuf.gl_pathv[j] + sysrootdirlen,
+                                                                      arg_createdir, arg_resolvedeps, true);
                                         }
                                 }
                         }
@@ -1382,9 +1426,8 @@ static int install_firmware_fullpath(const char *fwpath)
 {
         const char *fw = fwpath;
         _cleanup_free_ char *fwpath_compressed = NULL;
-        struct stat sb;
         int ret;
-        if (stat(fwpath, &sb) != 0) {
+        if (access(fwpath, F_OK) != 0) {
                 _asprintf(&fwpath_compressed, "%s.zst", fwpath);
                 if (access(fwpath_compressed, F_OK) != 0) {
                         strcpy(fwpath_compressed + strlen(fwpath) + 1, "xz");
@@ -1427,12 +1470,11 @@ static int install_firmware(struct kmod_module *mod)
                 ret = -1;
                 STRV_FOREACH(q, firmwaredirs) {
                         _cleanup_free_ char *fwpath = NULL;
-                        struct stat sb;
 
                         _asprintf(&fwpath, "%s/%s", *q, value);
 
-                        if ((strstr(value, "*") != 0 || strstr(value, "?") != 0 || strstr(value, "[") != 0)
-                            && stat(fwpath, &sb) != 0) {
+                        if (strpbrk(value, "*?[") != NULL
+                            && access(fwpath, F_OK) != 0) {
                                 size_t i;
                                 _cleanup_globfree_ glob_t globbuf;
 
@@ -1719,7 +1761,8 @@ static int modalias_list(struct kmod_ctx *ctx)
                         struct kmod_module *mod = kmod_module_get_module(l);
                         char *name = strdup(kmod_module_get_name(mod));
                         kmod_module_unref(mod);
-                        hashmap_put(modules_loaded, name, name);
+                        if (hashmap_put(modules_loaded, name, name) < 0)
+                                free(name);
                 }
         }
 
@@ -1734,8 +1777,11 @@ static int modalias_list(struct kmod_ctx *ctx)
 
                         struct kmod_module *mod = kmod_module_get_module(itr);
                         char *name = strdup(kmod_module_get_name(mod));
-                        hashmap_put(modules_loaded, name, name);
                         kmod_module_unref(mod);
+                        if (hashmap_put(modules_loaded, name, name) < 0) {
+                                free(name);
+                                continue;
+                        }
 
                         /* also put the modules from the new kernel in the hashmap,
                          * which resolve the name as an alias, in case a kernel module is
@@ -1749,8 +1795,9 @@ static int modalias_list(struct kmod_ctx *ctx)
                         kmod_list_foreach(l, modlist) {
                                 mod = kmod_module_get_module(l);
                                 char *name = strdup(kmod_module_get_name(mod));
-                                hashmap_put(modules_loaded, name, name);
                                 kmod_module_unref(mod);
+                                if (hashmap_put(modules_loaded, name, name) < 0)
+                                        free(name);
                         }
                 }
                 kmod_module_unref_list(loaded_list);
@@ -1804,7 +1851,8 @@ static int install_modules(int argc, char **argv)
 
                                         log_debug("Adding module '%s' to hostonly module list", name);
                                         dupname = strdup(name);
-                                        hashmap_put(modules_loaded, dupname, dupname);
+                                        if (hashmap_put(modules_loaded, dupname, dupname) < 0)
+                                                free(dupname);
                                 }
                         }
                 }
@@ -2042,7 +2090,8 @@ int main(int argc, char **argv)
                 HASHMAP_FOREACH(name, modules_loaded, i) {
                         printf("%s\n", name);
                 }
-                exit(0);
+                r = EXIT_SUCCESS;
+                goto finish2;
         }
 
         log_debug("Program arguments:");
@@ -2079,7 +2128,6 @@ int main(int argc, char **argv)
                         log_error("Environment DESTROOTDIR or argument -D is not set!");
                         usage(EXIT_FAILURE);
                 }
-                destrootdir = strdup(destrootdir);
         }
 
         if (strcmp(destrootdir, "/") == 0) {
@@ -2088,13 +2136,11 @@ int main(int argc, char **argv)
         }
 
         i = destrootdir;
-        destrootdir = realpath(destrootdir, NULL);
-        if (!destrootdir) {
+        if (!(destrootdir = realpath(i, NULL))) {
                 log_error("Environment DESTROOTDIR or argument -D is set to '%s': %m", i);
                 r = EXIT_FAILURE;
-                goto finish;
+                goto finish2;
         }
-        free(i);
 
         items = hashmap_new(string_hash_func, string_compare_func);
         items_failed = hashmap_new(string_hash_func, string_compare_func);
@@ -2102,7 +2148,7 @@ int main(int argc, char **argv)
         if (!items || !items_failed || !modules_loaded) {
                 log_error("Out of memory");
                 r = EXIT_FAILURE;
-                goto finish;
+                goto finish1;
         }
 
         if (logdir) {
@@ -2112,7 +2158,7 @@ int main(int argc, char **argv)
                 if (logfile_f == NULL) {
                         log_error("Could not open %s for logging: %m", logfile);
                         r = EXIT_FAILURE;
-                        goto finish;
+                        goto finish1;
                 }
         }
 
@@ -2145,7 +2191,9 @@ int main(int argc, char **argv)
         if (arg_optional)
                 r = EXIT_SUCCESS;
 
-finish:
+finish1:
+        free(destrootdir);
+finish2:
         if (logfile_f)
                 fclose(logfile_f);
 
@@ -2162,7 +2210,17 @@ finish:
         hashmap_free(items_failed);
         hashmap_free(modules_loaded);
 
-        free(destrootdir);
+        if (arg_mod_filter_path)
+                regfree(&mod_filter_path);
+        if (arg_mod_filter_nopath)
+                regfree(&mod_filter_nopath);
+        if (arg_mod_filter_symbol)
+                regfree(&mod_filter_symbol);
+        if (arg_mod_filter_nosymbol)
+                regfree(&mod_filter_nosymbol);
+        if (arg_mod_filter_noname)
+                regfree(&mod_filter_noname);
+
         strv_free(firmwaredirs);
         strv_free(pathdirs);
         return r;
