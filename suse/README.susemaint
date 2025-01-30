@@ -371,3 +371,5 @@ d0c82322 fix(dracut): do not add all lib subdirs to `LD_LIBRARY_PATH` with `--sy
 3748ed4d fix(nvmf): install (only) required nvmf modules
 d2ade8a6 fix(dm): remove 59-persistent-storage-dm.rules
 c79fc8fd fix(dracut): rework timeout for devices added via --mount and --add-device
+cc2c48a0 fix(iscsi): don't require network setup for bnx2i
+f30cf46e fix(iscsi): attempt iSCSI login before all interfaces are up
