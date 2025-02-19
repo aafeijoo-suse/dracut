@@ -390,5 +390,6 @@ ad36b61e fix(dracut.sh): omit compressed kernel modules from find searching exec
 bfa00c2a fix(pcsc): add libpcsclite_real.so.*
 0df92885 fix(systemd-tmpfiles): copy 20-systemd-stub.conf into the initrd
 c79fc8fd fix(dracut): rework timeout for devices added via --mount and --add-device
+93df9ad2 feat(livenet): get live image size from TFTP servers
 cc2c48a0 fix(iscsi): don't require network setup for bnx2i
 f30cf46e fix(iscsi): attempt iSCSI login before all interfaces are up
